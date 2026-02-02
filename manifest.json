@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Gmail OTP",
   "version": "0.95.0",
-  "description": "Локальный помощник для поиска OTP-кодов в Gmail.",
+  "description": "Минималистичный помощник для поиска OTP-кодов в Gmail. Постепенно учится на ваших отметках.",
   "action": {
     "default_title": "Gmail OTP",
     "default_popup": "popup.html",
