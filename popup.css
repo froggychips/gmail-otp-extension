@@ -112,3 +112,33 @@ button:disabled {
   color: #6b7280;
   margin-top: 6px;
 }
+
+.unmatched-list {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #374151;
+}
+
+.unmatched-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
+.unmatched-title {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.unmatched-meta {
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.unmatched-actions {
+  display: flex;
+  gap: 6px;
+}

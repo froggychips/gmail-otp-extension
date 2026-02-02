@@ -8,7 +8,10 @@ const STORAGE_KEYS = {
   query: "gmailQuery",
   unreadOnly: "gmailUnreadOnly",
   lastEntry: "gmailLastEntry",
-  lastMessageId: "gmailLastMessageId"
+  lastMessageId: "gmailLastMessageId",
+  unmatched: "gmailUnmatched",
+  senderAllowlist: "gmailSenderAllowlist",
+  senderBlocklist: "gmailSenderBlocklist"
 };
 
 const MSG = {
@@ -62,6 +65,21 @@ function getHeader(headers, name) {
     (h) => h && h.name && h.name.toLowerCase() === name.toLowerCase()
   );
   return found && found.value ? String(found.value) : "";
+}
+
+function extractEmailAddress(from) {
+  if (!from) return "";
+  const match = String(from).match(/<([^>]+)>/);
+  if (match && match[1]) return match[1].trim().toLowerCase();
+  const direct = String(from).trim().toLowerCase();
+  return direct.includes("@") ? direct : "";
+}
+
+function extractEmailDomain(from) {
+  const addr = extractEmailAddress(from);
+  if (!addr) return "";
+  const parts = addr.split("@");
+  return parts.length === 2 ? parts[1] : "";
 }
 
 function base64UrlDecode(input) {
@@ -159,6 +177,38 @@ async function getStoredGmailUnreadOnly() {
   });
 }
 
+async function getStoredSenderList(key) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([key], (data) => {
+      const list = data && Array.isArray(data[key]) ? data[key] : [];
+      resolve(list.map((item) => String(item).toLowerCase()).filter(Boolean));
+    });
+  });
+}
+
+async function getStoredUnmatched() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([STORAGE_KEYS.unmatched], (data) => {
+      resolve(data && Array.isArray(data[STORAGE_KEYS.unmatched]) ? data[STORAGE_KEYS.unmatched] : []);
+    });
+  });
+}
+
+async function saveUnmatchedMessages(entries) {
+  if (!entries.length) return;
+  const existing = await getStoredUnmatched();
+  const byId = new Map(existing.map((item) => [item.id, item]));
+  entries.forEach((item) => {
+    if (item && item.id && !byId.has(item.id)) {
+      byId.set(item.id, item);
+    }
+  });
+  const merged = Array.from(byId.values()).slice(0, 40);
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [STORAGE_KEYS.unmatched]: merged }, () => resolve());
+  });
+}
+
 async function getStoredLastGmailId() {
   return new Promise((resolve) => {
     chrome.storage.local.get([STORAGE_KEYS.lastMessageId], (data) => {
@@ -177,6 +227,8 @@ async function fetchLatestGmailCode(overrideQuery = "") {
   const storedQuery = normalizeQuery(await getStoredGmailQuery());
   const providedQuery = normalizeQuery(overrideQuery);
   const unreadOnly = await getStoredGmailUnreadOnly();
+  const senderAllowlist = await getStoredSenderList(STORAGE_KEYS.senderAllowlist);
+  const senderBlocklist = await getStoredSenderList(STORAGE_KEYS.senderBlocklist);
   const baseQuery = providedQuery || storedQuery || GMAIL_QUERY_DEFAULT;
   const extraParts = [];
   if (!/\bin:\w+/i.test(baseQuery)) extraParts.push("in:inbox");
@@ -192,6 +244,7 @@ async function fetchLatestGmailCode(overrideQuery = "") {
   if (!data.messages?.length) return null;
 
   let best = null;
+  const unmatched = [];
   for (const item of data.messages) {
     if (!item || !item.id) continue;
     const msg = await gmailApiRequest(`messages/${item.id}?format=full`, { token });
@@ -201,12 +254,29 @@ async function fetchLatestGmailCode(overrideQuery = "") {
     const from = getHeader(headers, "From");
     const date = getHeader(headers, "Date");
     const bodyText = extractTextFromPayload(msg.payload);
+    const senderDomain = extractEmailDomain(from);
+    if (senderDomain && senderBlocklist.includes(senderDomain)) {
+      continue;
+    }
     const code =
       findOtpCode(subject) ||
       findOtpCode(snippet) ||
       findOtpCode(bodyText);
-    if (!code) continue;
-    const score = scoreCodeCandidate({ code, subject, from, snippet, body: bodyText });
+    const senderBonus = senderDomain && senderAllowlist.includes(senderDomain) ? 3 : 0;
+    if (!code) {
+      if (containsOtpKeywords(subject) || containsOtpKeywords(snippet)) {
+        unmatched.push({
+          id: item.id,
+          from,
+          subject,
+          date,
+          snippet,
+          domain: senderDomain || ""
+        });
+      }
+      continue;
+    }
+    const score = scoreCodeCandidate({ code, subject, from, snippet, body: bodyText }) + senderBonus;
     if (score < 3) continue;
     const entry = { code, id: item.id, snippet, subject, from, date, score };
     if (!best || entry.score > best.score) {
@@ -214,6 +284,9 @@ async function fetchLatestGmailCode(overrideQuery = "") {
     }
   }
 
+  if (!best) {
+    await saveUnmatchedMessages(unmatched);
+  }
   if (best) {
     const { score, ...result } = best;
     return result;
