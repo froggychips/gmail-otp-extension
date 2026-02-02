@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Gmail OTP",
+  "version": "0.1.0",
+  "description": "Локальный помощник для поиска OTP-кодов в Gmail.",
+  "action": {
+    "default_title": "Gmail OTP",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/frogus-16.png",
+      "32": "icons/frogus-32.png",
+      "48": "icons/frogus-48.png",
+      "128": "icons/frogus-128.png",
+      "512": "icons/frogus-512.png"
+    }
+  },
+  "icons": {
+    "16": "icons/frogus-16.png",
+    "32": "icons/frogus-32.png",
+    "48": "icons/frogus-48.png",
+    "128": "icons/frogus-128.png",
+    "512": "icons/frogus-512.png"
+  },
+  "permissions": [
+    "alarms",
+    "identity",
+    "notifications",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://gmail.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "920198611393-j6vk0quu23vlc6mvlgj6ci1ae13b5ici.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly"
+    ]
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

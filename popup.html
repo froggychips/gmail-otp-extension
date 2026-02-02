@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gmail OTP</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <div class="title">Gmail OTP</div>
+        <div id="status" class="status">Готово</div>
+      </header>
+
+      <section class="panel">
+        <div class="row">
+          <label class="label">Аккаунт</label>
+          <span id="gmailStatus" class="value">Не подключено</span>
+        </div>
+        <div class="row start">
+          <button id="gmailConnect" class="primary">Подключить</button>
+          <button id="gmailDisconnect" class="ghost">Отключить</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <label class="label" for="gmailQuery">Фильтр писем</label>
+        <input
+          id="gmailQuery"
+          type="text"
+          placeholder="newer_than:7d subject:(code OR verification OR подтверждение OR код)"
+        />
+        <div class="row">
+          <label class="label" for="gmailUnreadOnly">Только непрочитанные</label>
+          <input id="gmailUnreadOnly" type="checkbox" />
+        </div>
+        <div class="hint">Опция добавляет is:unread к запросу.</div>
+        <div class="row start">
+          <button id="gmailFetchCode" class="secondary">Найти код</button>
+          <button id="gmailCopyCode" class="ghost">Скопировать</button>
+        </div>
+        <div
+          id="gmailCode"
+          class="code-pill"
+          role="button"
+          tabindex="0"
+          aria-label="Gmail код. Нажмите, чтобы скопировать."
+        >
+          —
+        </div>
+        <div id="gmailMeta" class="meta">—</div>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
