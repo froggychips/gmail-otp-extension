@@ -405,3 +405,43 @@ input[type="range"] {
 .active.tabs-content {
   animation: fadeIn 0.3s ease-out;
 }
+
+/* Unmatched emails */
+.unmatched-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  margin-bottom: 12px;
+}
+.unmatched-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.unmatched-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.unmatched-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.unmatched-actions button {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+.unmatched-actions .secondary {
+  background: var(--accent);
+  color: white;
+  border: none;
+}
+.unmatched-actions .ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}

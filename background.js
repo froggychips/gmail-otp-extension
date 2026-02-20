@@ -57,6 +57,11 @@ async function gmailApiRequest(path, token) {
   });
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) throw new Error("auth_error");
+    if (res.status === 429) {
+      log("Gmail rate limit (429). Waiting 60 seconds...");
+      await new Promise(r => setTimeout(r, 60000));
+      throw new Error("rate_limit");
+    }
     throw new Error(`Gmail API error: ${res.status}`);
   }
   return res.json();
@@ -351,6 +356,7 @@ async function runGmailWatch() {
         }
       } catch (err) {
         log(`[Watch] Error for ${account.email}:`, err.message);
+        continue;
       }
     }
   } catch (e) {

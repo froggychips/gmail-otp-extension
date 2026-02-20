@@ -5,7 +5,6 @@ const gmailFetchCodeBtn = document.getElementById("gmailFetchCode");
 const gmailCodeEl = document.getElementById("gmailCode");
 const gmailMetaEl = document.getElementById("gmailMeta");
 const statusEl = document.getElementById("status");
-const lastCheckEl = document.getElementById("lastCheck");
 const lastCheckTimeEl = document.getElementById("lastCheckTime");
 const unmatchedListEl = document.getElementById("unmatchedList");
 const unmatchedClearBtn = document.getElementById("unmatchedClear");
@@ -589,5 +588,6 @@ if (importDataBtn) {
 
 init().catch(e => {
   console.error("Init failed", e);
-  setStatus(TEXT.loadError);
+  setStatus(TEXT.loadError || "Ошибка загрузки");
+  if (statusEl) statusEl.style.color = "var(--danger)";
 });
