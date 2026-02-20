@@ -269,10 +269,15 @@ async function fetchLatestGmailCode(token, overrideQuery = "") {
   if (!/\bin:\w+/i.test(baseQuery)) extraParts.push("in:inbox");
   if (unreadOnly && !/\bis:unread\b/i.test(baseQuery)) extraParts.push("is:unread");
   const query = mergeQueryParts(baseQuery, extraParts);
+  await log("Searching Gmail with query:", query);
 
   const data = await gmailApiRequest(`messages?maxResults=30&q=${encodeURIComponent(query)}`, token);
-  if (!data.messages?.length) return null;
+  if (!data.messages?.length) {
+    await log("No messages matching query found.");
+    return null;
+  }
 
+  await log(`Found ${data.messages.length} potential messages. Analyzing...`);
   let best = null;
   const unmatched = [];
   for (const item of data.messages) {
@@ -310,13 +315,17 @@ async function fetchLatestGmailCode(token, overrideQuery = "") {
     if (score < threshold) continue;
     
     const entry = { code, id: item.id, snippet, subject, from, date, score };
-    if (!best || entry.score > best.score) best = entry;
+    if (!best || entry.score > best.score) {
+      best = entry;
+      await log(`Candidate code found: ${code} (Score: ${score})`);
+    }
   }
 
-  if (!best) await saveUnmatchedMessages(unmatched);
-  if (best) {
-    const { score, ...result } = best;
-    return result;
+  if (!best) {
+    await log("Analysis complete. No valid OTP codes identified.");
+    await saveUnmatchedMessages(unmatched);
+  } else {
+    await log(`Best code identified: ${best.code}`);
   }
   return null;
 }
