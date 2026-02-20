@@ -11,6 +11,7 @@ const lastCheckTimeEl = document.getElementById("lastCheckTime");
 const unmatchedListEl = document.getElementById("unmatchedList");
 const unmatchedClearBtn = document.getElementById("unmatchedClear");
 const historyListEl = document.getElementById("historyList");
+const clearHistoryBtn = document.getElementById("clearHistory");
 const undoActionBtn = document.getElementById("undoAction");
 const gmailThresholdEl = document.getElementById("gmailThreshold");
 const thresholdValEl = document.getElementById("thresholdVal");
@@ -58,7 +59,8 @@ const I18N = {
     profileNote: "Используется аккаунт профиля Chrome", maxAccounts: "Достигнут лимит (3 аккаунта)",
     justChecked: "Только что проверено", checkedAgo: " мин назад", lastChecked: "Последняя проверка: ",
     reset: "Сбросить всё", resetConfirm: "Вы уверены? Это удалит все настройки и аккаунты.",
-    testRun: "Глубокий тест (500 писем)", testRunOk: "Тест завершен! Найдено кодов: "
+    testRun: "Глубокий тест (500 писем)", testRunOk: "Тест завершен! Найдено кодов: ",
+    clearHistory: "Очистить историю", clearHistoryConfirm: "Вы уверены, что хотите очистить всю историю кодов?"
   },
   en: {
     code: "Code", history: "History", filters: "Filters", tools: "Tools",
@@ -84,7 +86,8 @@ const I18N = {
     profileNote: "Uses your Chrome Profile account", maxAccounts: "Limit reached (3 accounts)",
     justChecked: "Just checked", checkedAgo: " min ago", lastChecked: "Last checked: ",
     reset: "Reset All", resetConfirm: "Are you sure? This will delete all settings and accounts.",
-    testRun: "Deep Test (500 emails)", testRunOk: "Test complete! Codes found: "
+    testRun: "Deep Test (500 emails)", testRunOk: "Test complete! Codes found: ",
+    clearHistory: "Clear History", clearHistoryConfirm: "Are you sure you want to clear all code history?"
   }
 };
 
@@ -440,6 +443,20 @@ if (resetExtensionBtn) {
     for (const acc of gmailAccounts) await sendMessageWithTimeout({ type: MSG.disconnect, email: acc.email }).catch(() => {});
     await new Promise(r => chrome.storage.local.clear(r));
     window.location.reload();
+  });
+}
+
+if (clearHistoryBtn) {
+  clearHistoryBtn.addEventListener("click", async () => {
+    if (!confirm(T.clearHistoryConfirm)) return;
+    gmailHistory = [];
+    gmailEntry = null;
+    await chrome.storage.local.set({ 
+      [STORAGE_KEYS.history]: [],
+      [STORAGE_KEYS.lastEntry]: null
+    });
+    renderHistory();
+    renderGmailPanel();
   });
 }
 

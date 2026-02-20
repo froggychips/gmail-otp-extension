@@ -299,10 +299,11 @@ async function performTestRun(token, email = "unknown") {
   allFoundCodes.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
   
   const { [STORAGE_KEYS.history]: existingHistory = [] } = await storageGet(STORAGE_KEYS.history);
-  const newHistory = [...allFoundCodes, ...existingHistory].slice(0, 500); // Allow much larger history for test run
+  // For deep test, we allow up to 1000 items in history to see all results
+  const newHistory = [...allFoundCodes, ...existingHistory].slice(0, 1000); 
   await storageSet({ [STORAGE_KEYS.history]: newHistory });
   
-  await log(`Test run complete. Found ${allFoundCodes.length} codes.`);
+  await log(`Test run complete. Found ${allFoundCodes.length} codes for ${email}.`);
   return allFoundCodes;
 }
 
