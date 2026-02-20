@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Gmail OTP",
   "version": "1.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzrE6RcT5kvj9qzfwsaimcvcXtw9LjMyHJhQdCx6wRy89Q0XBGQissFnOB10+gXFZF6HWkOFRa4hLhFndXt6gSniKvKr/WqNVxSdQ2MJxV9pfO3Rs3DhldBlQV3CjGEpDcvEazVErlPJKuq+EjEYcSVihSvWOi41a9bK6c3vysf8egnZfHsfH8xDRWaeyhqUMSl11n7c4I/Iib7zXeK/zS/mBrzMxYjh2+BkzgzFH2aviylNsNnjhUv+PXclTbwOpU2B5IKiA6uQt4paykBJJ7TIH2+qIf14xBTF/HPM9N/iEdAtWok/o8k7Of6blxSvm/CGj7tGiNHLpdLjBvU3BjQIDAQAB",
   "description": "Автоматически находит OTP-коды в Gmail и вставляет их в 1 клик. Работает локально и безопасно.",
   "homepage_url": "https://github.com/fagionpw/gmail-otp-extension",
   "action": {
@@ -34,7 +35,7 @@
     "https://gmail.googleapis.com/*"
   ],
   "oauth2": {
-    "client_id": "YOUR_OWN_CLIENT_ID.apps.googleusercontent.com",
+    "client_id": "629171495161-2sh2eo41d651fdtpi4r3dvrn3q5ki3oj.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/gmail.readonly"
     ]
