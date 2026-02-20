@@ -17,6 +17,7 @@ const thresholdValEl = document.getElementById("thresholdVal");
 const exportDataBtn = document.getElementById("exportData");
 const importDataBtn = document.getElementById("importData");
 const resetExtensionBtn = document.getElementById("resetExtension");
+const testRunBtn = document.getElementById("testRun");
 const modeAutoBtn = document.getElementById("modeAuto");
 const modeManualBtn = document.getElementById("modeManual");
 const modeHintEl = document.getElementById("modeHint");
@@ -56,7 +57,8 @@ const I18N = {
     noSubject: "(без темы)", markCode: "Это код", markNoCode: "Не код",
     profileNote: "Используется аккаунт профиля Chrome", maxAccounts: "Достигнут лимит (3 аккаунта)",
     justChecked: "Только что проверено", checkedAgo: " мин назад", lastChecked: "Последняя проверка: ",
-    reset: "Сбросить всё", resetConfirm: "Вы уверены? Это удалит все настройки и аккаунты."
+    reset: "Сбросить всё", resetConfirm: "Вы уверены? Это удалит все настройки и аккаунты.",
+    testRun: "Глубокий тест (500 писем)", testRunOk: "Тест завершен! Найдено кодов: "
   },
   en: {
     code: "Code", history: "History", filters: "Filters", tools: "Tools",
@@ -81,7 +83,8 @@ const I18N = {
     noSubject: "(no subject)", markCode: "It's a code", markNoCode: "Not a code",
     profileNote: "Uses your Chrome Profile account", maxAccounts: "Limit reached (3 accounts)",
     justChecked: "Just checked", checkedAgo: " min ago", lastChecked: "Last checked: ",
-    reset: "Reset All", resetConfirm: "Are you sure? This will delete all settings and accounts."
+    reset: "Reset All", resetConfirm: "Are you sure? This will delete all settings and accounts.",
+    testRun: "Deep Test (500 emails)", testRunOk: "Test complete! Codes found: "
   }
 };
 
@@ -407,6 +410,29 @@ if (hero) {
 
 if (refreshLogsBtn) refreshLogsBtn.addEventListener("click", () => renderLogs());
 if (clearLogsBtn) clearLogsBtn.addEventListener("click", () => sendMessageWithTimeout({ type: MSG.clearLogs }).then(() => renderLogs()));
+
+if (testRunBtn) {
+  testRunBtn.addEventListener("click", async () => {
+    testRunBtn.disabled = true;
+    const originalText = testRunBtn.textContent;
+    testRunBtn.textContent = "⏳ " + (T.searching || "Searching...");
+    
+    try {
+      const response = await sendMessageWithTimeout({ type: MSG.testRun }, 60000); // Higher timeout for deep scan
+      if (response?.ok) {
+        alert(T.testRunOk + response.count);
+        // Refresh history if current tab is history
+        const activeTab = document.querySelector(".tab-btn.active");
+        if (activeTab?.getAttribute("data-tab") === "history") renderHistory();
+      }
+    } catch (err) {
+      console.error("Test run failed:", err);
+    } finally {
+      testRunBtn.disabled = false;
+      testRunBtn.textContent = originalText;
+    }
+  });
+}
 
 if (resetExtensionBtn) {
   resetExtensionBtn.addEventListener("click", async () => {

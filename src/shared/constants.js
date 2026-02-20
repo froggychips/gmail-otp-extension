@@ -20,7 +20,8 @@ export const MSG = {
   modeAuto: "GMAIL_MODE_AUTO",
   modeManual: "GMAIL_MODE_MANUAL",
   getLogs: "GMAIL_GET_LOGS",
-  clearLogs: "GMAIL_CLEAR_LOGS"
+  clearLogs: "GMAIL_CLEAR_LOGS",
+  testRun: "GMAIL_TEST_RUN"
 };
 
 export const MAX_ACCOUNTS = 3;

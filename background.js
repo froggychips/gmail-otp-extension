@@ -240,7 +240,90 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === "gmailWatch") runGmailWatch(); });
 
+async function performTestRun(token, email = "unknown") {
+  const stored = await storageGet([
+    STORAGE_KEYS.senderAllowlist, STORAGE_KEYS.senderBlocklist, STORAGE_KEYS.threshold
+  ]);
+  const threshold = stored[STORAGE_KEYS.threshold] || 3;
+  // Deep scan: no newer_than, just OTP keywords
+  const query = "subject:(code OR verification OR подтверждение OR код) in:inbox";
+  
+  await log(`Starting DEEP TEST RUN for ${email}...`);
+  const data = await gmailApiRequest(`messages?maxResults=500&q=${encodeURIComponent(query)}`, token, email);
+  if (!data.messages?.length) {
+    await log("Test run: No messages found.");
+    return [];
+  }
+
+  await log(`Test run: Found ${data.messages.length} messages. Fetching in batches...`);
+  const allFoundCodes = [];
+  
+  // Process in batches of 20 to avoid overwhelming
+  const batchSize = 20;
+  for (let i = 0; i < data.messages.length; i += batchSize) {
+    const batch = data.messages.slice(i, i + batchSize);
+    const details = await Promise.all(
+      batch.map(item => gmailApiRequest(`messages/${item.id}?format=full`, token, email).catch(() => null))
+    );
+
+    for (const msg of details) {
+      if (!msg) continue;
+      const headers = msg.payload?.headers || [];
+      const subject = getHeader(headers, "Subject");
+      const from = getHeader(headers, "From");
+      const bodyText = extractTextFromPayload(msg.payload);
+      const senderDomain = extractEmailDomain(from);
+      
+      const code = findOtpCode(subject) || findOtpCode(msg.snippet) || findOtpCode(bodyText);
+      if (!code) continue;
+
+      const score = scoreCodeCandidate({ 
+        code, subject, from, snippet: msg.snippet, body: bodyText, 
+        senderAllowlist: stored[STORAGE_KEYS.senderAllowlist], 
+        senderBlocklist: stored[STORAGE_KEYS.senderBlocklist], 
+        senderDomain 
+      });
+
+      if (score >= threshold) {
+        allFoundCodes.push({
+          code, id: msg.id, snippet: msg.snippet, subject, from, 
+          date: getHeader(headers, "Date"), score, account: email,
+          internalDate: msg.internalDate
+        });
+      }
+    }
+    await log(`Test run progress: ${Math.min(i + batchSize, data.messages.length)}/${data.messages.length}`);
+  }
+
+  // Sort by date before returning
+  allFoundCodes.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
+  
+  const { [STORAGE_KEYS.history]: existingHistory = [] } = await storageGet(STORAGE_KEYS.history);
+  const newHistory = [...allFoundCodes, ...existingHistory].slice(0, 500); // Allow much larger history for test run
+  await storageSet({ [STORAGE_KEYS.history]: newHistory });
+  
+  await log(`Test run complete. Found ${allFoundCodes.length} codes.`);
+  return allFoundCodes;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === MSG.testRun) {
+    storageGet(STORAGE_KEYS.accounts).then(async data => {
+      const accounts = data[STORAGE_KEYS.accounts] || [];
+      let totalFound = 0;
+      for (const account of accounts) {
+        try {
+          const token = await getAuthToken(false, account.email);
+          const results = await performTestRun(token, account.email);
+          totalFound += results.length;
+        } catch (e) {
+          await log(`Test run failed for ${account.email}:`, e.message);
+        }
+      }
+      sendResponse({ ok: true, count: totalFound });
+    });
+    return true;
+  }
   if (message.type === MSG.modeAuto) {
     storageSet({ [STORAGE_KEYS.mode]: "auto" }).then(() => { updateAlarmState("auto"); log("Mode: Auto"); sendResponse({ ok: true }); });
     return true;
