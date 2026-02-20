@@ -25,7 +25,10 @@ const MSG = {
 
 const MAX_ACCOUNTS = 3;
 const MAX_LOG_ENTRIES = 50;
-let currentOtpCode = null;   // последний найденный код для контекстного меню
+let currentOtpCode = null;
+
+const CLIENT_ID = "629171495161-2sh2eo41d651fdtpi4r3dvrn3q5ki3oj.apps.googleusercontent.com";
+const SCOPES = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email";
 
 async function log(...args) {
   const newEntry = {
@@ -43,11 +46,37 @@ async function log(...args) {
 
 function getAuthToken(interactive = false) {
   return new Promise((resolve, reject) => {
-    // Note: for multi-account, chrome.identity usually uses the primary profile account.
-    // To support multiple specific accounts in the background, the user must have selected them.
-    chrome.identity.getAuthToken({ interactive }, (token) => {
-      if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-      else resolve(token);
+    const redirectUrl = chrome.identity.getRedirectURL();
+
+    let authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${encodeURIComponent(CLIENT_ID)}&` +
+      `redirect_uri=${encodeURIComponent(redirectUrl)}&` +
+      `response_type=token&` +
+      `scope=${encodeURIComponent(SCOPES)}&` +
+      `prompt=${interactive ? 'select_account consent' : 'none'}`;
+
+    chrome.identity.launchWebAuthFlow({
+      url: authUrl,
+      interactive: interactive
+    }, (responseUrl) => {
+      if (chrome.runtime.lastError || !responseUrl) {
+        reject(chrome.runtime.lastError || new Error("Auth cancelled or failed"));
+        return;
+      }
+
+      try {
+        const fragment = responseUrl.split('#')[1];
+        const params = new URLSearchParams(fragment);
+        const token = params.get('access_token');
+
+        if (token) {
+          resolve(token);
+        } else {
+          reject(new Error("No access_token in response"));
+        }
+      } catch (e) {
+        reject(e);
+      }
     });
   });
 }
@@ -184,31 +213,6 @@ function mergeQueryParts(query, extraParts = []) {
   return parts.join(" ").trim();
 }
 
-async function getStoredGmailQuery() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([STORAGE_KEYS.query], (data) => {
-      resolve(data && data[STORAGE_KEYS.query] ? String(data[STORAGE_KEYS.query]) : "");
-    });
-  });
-}
-
-async function getStoredGmailUnreadOnly() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([STORAGE_KEYS.unreadOnly], (data) => {
-      resolve(!!(data && data[STORAGE_KEYS.unreadOnly]));
-    });
-  });
-}
-
-async function getStoredSenderList(key) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([key], (data) => {
-      const list = data && Array.isArray(data[key]) ? data[key] : [];
-      resolve(list.map((item) => String(item).toLowerCase()).filter(Boolean));
-    });
-  });
-}
-
 async function getStoredUnmatched() {
   return new Promise((resolve) => {
     chrome.storage.local.get([STORAGE_KEYS.unmatched], (data) => {
@@ -227,22 +231,8 @@ async function saveUnmatchedMessages(entries) {
     }
   });
   const merged = Array.from(byId.values()).slice(0, 40);
-  return new Promise((resolve) => {
+  await new Promise((resolve) => {
     chrome.storage.local.set({ [STORAGE_KEYS.unmatched]: merged }, () => resolve());
-  });
-}
-
-async function getStoredLastGmailId() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([STORAGE_KEYS.lastMessageId], (data) => {
-      resolve(data && data[STORAGE_KEYS.lastMessageId] ? String(data[STORAGE_KEYS.lastMessageId]) : "");
-    });
-  });
-}
-
-async function setStoredLastGmailId(id) {
-  return new Promise((resolve) => {
-    chrome.storage.local.set({ [STORAGE_KEYS.lastMessageId]: id || null }, () => resolve());
   });
 }
 
@@ -305,7 +295,6 @@ async function fetchLatestGmailCode(token, overrideQuery = "") {
     
     let score = scoreCodeCandidate({ code, subject, from, snippet, body: bodyText }) + senderBonus;
     
-    // Patch bonuses
     const codeLen = code.length;
     if (codeLen === 6 && /^\d{6}$/.test(code)) score += 3;
     if (codeLen >= 4 && codeLen <= 8) score += 1;
@@ -327,7 +316,7 @@ async function fetchLatestGmailCode(token, overrideQuery = "") {
   } else {
     await log(`Best code identified: ${best.code}`);
   }
-  return null;
+  return best;
 }
 
 async function runGmailWatch() {
@@ -339,18 +328,15 @@ async function runGmailWatch() {
 
     chrome.storage.local.set({ [STORAGE_KEYS.lastCheckTime]: Date.now() });
 
-    // Iterate through all accounts
     for (const account of accounts) {
       try {
-        // We attempt to get a token. For secondary accounts this might fail in background 
-        // if not recently refreshed, but chrome.identity handles most of it.
         const token = await getAuthToken(false);
         const codeData = await fetchLatestGmailCode(token);
         
         if (codeData && codeData.id !== account.lastMessageId) {
           account.lastMessageId = codeData.id;
-          codeData.account = account.email; // Tag with account email
-          updateOtpContextMenu(codeData.code);   // обновляем контекстное меню
+          codeData.account = account.email;
+          updateOtpContextMenu(codeData.code);
           
           let newHistory = [codeData, ...history].slice(0, 10);
           await new Promise(resolve => chrome.storage.local.set({ 
@@ -368,12 +354,14 @@ async function runGmailWatch() {
           });
         }
       } catch (err) {
-        log(`[Watch] Error for ${account.email}:`, err.message);
+        if (err.message !== "Auth cancelled or failed") {
+          await log(`[Watch] Error for ${account.email}:`, err.message);
+        }
         continue;
       }
     }
   } catch (e) {
-    log("[GmailWatch] Global error:", e.message);
+    await log("[GmailWatch] Global error:", e.message);
   }
 }
 
@@ -396,11 +384,9 @@ function updateAlarmState(mode) {
   }
 }
 
-// === CONTEXT MENU ===
 function updateOtpContextMenu(code) {
   if (!code) return;
   currentOtpCode = code;
-
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: "pasteOtp",
@@ -452,7 +438,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       try {
         const currentId = chrome.runtime.id;
         await log("Starting connect flow. Extension ID:", currentId);
-        await log("Attempting to add account...");
+        
+        await log("Attempting to add account (interactive picker)...");
         const token = await getAuthToken(true);
         if (!token) throw new Error("No token returned");
         
@@ -460,18 +447,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const email = await fetchGmailProfile(token);
         if (email) {
           const { [STORAGE_KEYS.accounts]: accounts = [] } = await new Promise(r => chrome.storage.local.get(STORAGE_KEYS.accounts, r));
+          
           if (accounts.some(a => a.email === email)) {
-            await log("Account already exists:", email);
+            await log("Duplicate account ignored:", email);
+            throw new Error(`Account ${email} is already added`);
           } else if (accounts.length >= MAX_ACCOUNTS) {
             throw new Error(`Max ${MAX_ACCOUNTS} accounts allowed`);
           } else {
             accounts.push({ email, lastMessageId: null });
             await new Promise(r => chrome.storage.local.set({ [STORAGE_KEYS.accounts]: accounts }, r));
-            await log("Account added:", email);
+            await log("Account added successfully:", email);
           }
           sendResponse({ ok: true, email, accounts });
         } else {
-          throw new Error("Failed to fetch email");
+          throw new Error("Failed to fetch email from profile");
         }
       } catch (error) {
         const errMsg = error.message || String(error);
@@ -488,12 +477,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const targetEmail = message.email;
         const { [STORAGE_KEYS.accounts]: accounts = [] } = await new Promise(r => chrome.storage.local.get(STORAGE_KEYS.accounts, r));
         const filtered = accounts.filter(a => a.email !== targetEmail);
-        
-        const token = await getAuthToken(false).catch(() => null);
-        if (token) {
-          await removeCachedToken(token);
-          await fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`).catch(() => {});
-        }
         
         await new Promise(r => chrome.storage.local.set({ [STORAGE_KEYS.accounts]: filtered }, r));
         log("Account removed:", targetEmail);
@@ -512,15 +495,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const { [STORAGE_KEYS.accounts]: accounts = [] } = await new Promise(r => chrome.storage.local.get(STORAGE_KEYS.accounts, r));
         if (!accounts.length) throw new Error("No accounts");
         
-        // Manual fetch checks ALL accounts and returns the best overall code
         let bestCode = null;
         for (const account of accounts) {
-          const token = await getAuthToken(false).catch(() => null);
-          if (!token) continue;
-          const code = await fetchLatestGmailCode(token, message.query || "");
-          if (code && (!bestCode || code.date > bestCode.date)) {
-            bestCode = { ...code, account: account.email };
-          }
+          try {
+            const token = await getAuthToken(false);
+            const code = await fetchLatestGmailCode(token, message.query || "");
+            if (code && (!bestCode || code.date > bestCode.date)) {
+              bestCode = { ...code, account: account.email };
+            }
+          } catch (e) {}
         }
         if (bestCode) chrome.storage.local.set({ [STORAGE_KEYS.lastEntry]: bestCode });
         sendResponse({ ok: !!bestCode, code: bestCode });
@@ -534,7 +517,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-// === КЛИК ПО КОНТЕКСТНОМУ МЕНЮ ===
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "pasteOtp" && currentOtpCode && tab?.id) {
     chrome.tabs.sendMessage(tab.id, {
