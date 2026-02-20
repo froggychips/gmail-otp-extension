@@ -1,14 +1,8 @@
-const GMAIL_QUERY_DEFAULT =
-  "subject:(code OR verification OR подтверждение OR код)";
-const GMAIL_ALARM_NAME = "gmailWatch";
-const GMAIL_ALARM_MINUTES = 1;
-
 const STORAGE_KEYS = {
-  email: "gmailEmail",
+  accounts: "gmailAccounts", // Array of { email, lastMessageId }
   query: "gmailQuery",
   unreadOnly: "gmailUnreadOnly",
   lastEntry: "gmailLastEntry",
-  lastMessageId: "gmailLastMessageId",
   unmatched: "gmailUnmatched",
   senderAllowlist: "gmailSenderAllowlist",
   senderBlocklist: "gmailSenderBlocklist",
@@ -29,39 +23,27 @@ const MSG = {
   clearLogs: "GMAIL_CLEAR_LOGS"
 };
 
+const MAX_ACCOUNTS = 3;
 const MAX_LOG_ENTRIES = 50;
 
 async function log(...args) {
   const newEntry = {
     ts: Date.now(),
     msg: args.map(arg => {
-      if (arg instanceof Error) {
-        return { message: arg.message, stack: arg.stack };
-      }
-      try {
-        return JSON.parse(JSON.stringify(arg));
-      } catch {
-        return String(arg);
-      }
+      if (arg instanceof Error) return { message: arg.message, stack: arg.stack };
+      try { return JSON.parse(JSON.stringify(arg)); } catch { return String(arg); }
     })
   };
-
-  const { [STORAGE_KEYS.logs]: logs = [] } = await new Promise(resolve =>
-    chrome.storage.local.get(STORAGE_KEYS.logs, resolve)
-  );
-
+  const { [STORAGE_KEYS.logs]: logs = [] } = await new Promise(resolve => chrome.storage.local.get(STORAGE_KEYS.logs, resolve));
   logs.unshift(newEntry);
-  if (logs.length > MAX_LOG_ENTRIES) {
-    logs.length = MAX_LOG_ENTRIES;
-  }
-
-  await new Promise(resolve =>
-    chrome.storage.local.set({ [STORAGE_KEYS.logs]: logs }, resolve)
-  );
+  if (logs.length > MAX_LOG_ENTRIES) logs.length = MAX_LOG_ENTRIES;
+  await new Promise(resolve => chrome.storage.local.set({ [STORAGE_KEYS.logs]: logs }, resolve));
 }
 
 function getAuthToken(interactive = false) {
   return new Promise((resolve, reject) => {
+    // Note: for multi-account, chrome.identity usually uses the primary profile account.
+    // To support multiple specific accounts in the background, the user must have selected them.
     chrome.identity.getAuthToken({ interactive }, (token) => {
       if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
       else resolve(token);
@@ -69,19 +51,12 @@ function getAuthToken(interactive = false) {
   });
 }
 
-async function gmailApiRequest(path, options = {}) {
-  const token = options.token || (await getAuthToken());
+async function gmailApiRequest(path, token) {
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
-    ...options,
-    headers: {
-      ...options.headers,
-      "Authorization": `Bearer ${token}`
-    }
+    headers: { "Authorization": `Bearer ${token}` }
   });
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
-      throw new Error("auth_error");
-    }
+    if (res.status === 401 || res.status === 403) throw new Error("auth_error");
     throw new Error(`Gmail API error: ${res.status}`);
   }
   return res.json();
@@ -263,7 +238,7 @@ async function setStoredLastGmailId(id) {
   });
 }
 
-async function fetchLatestGmailCode(overrideQuery = "") {
+async function fetchLatestGmailCode(token, overrideQuery = "") {
   const stored = await new Promise((resolve) => {
     chrome.storage.local.get([
       STORAGE_KEYS.query,
@@ -281,25 +256,20 @@ async function fetchLatestGmailCode(overrideQuery = "") {
   const senderBlocklist = Array.isArray(stored[STORAGE_KEYS.senderBlocklist]) ? stored[STORAGE_KEYS.senderBlocklist] : [];
   const threshold = typeof stored[STORAGE_KEYS.threshold] === "number" ? stored[STORAGE_KEYS.threshold] : 3;
 
-  const baseQuery = providedQuery || storedQuery || GMAIL_QUERY_DEFAULT;
+  const baseQuery = providedQuery || storedQuery || "newer_than:1h subject:(code OR verification OR подтверждение OR код)";
   const extraParts = [];
   if (!/\bin:\w+/i.test(baseQuery)) extraParts.push("in:inbox");
-  if (!/\bnewer_than:\w+/i.test(baseQuery)) extraParts.push("newer_than:2d");
   if (unreadOnly && !/\bis:unread\b/i.test(baseQuery)) extraParts.push("is:unread");
   const query = mergeQueryParts(baseQuery, extraParts);
 
-  const token = await getAuthToken(false);
-  const data = await gmailApiRequest(
-    `messages?maxResults=5&q=${encodeURIComponent(query)}`,
-    { token }
-  );
+  const data = await gmailApiRequest(`messages?maxResults=30&q=${encodeURIComponent(query)}`, token);
   if (!data.messages?.length) return null;
 
   let best = null;
   const unmatched = [];
   for (const item of data.messages) {
     if (!item || !item.id) continue;
-    const msg = await gmailApiRequest(`messages/${item.id}?format=full`, { token });
+    const msg = await gmailApiRequest(`messages/${item.id}?format=full`, token);
     const snippet = msg.snippet || "";
     const headers = msg.payload?.headers || [];
     const subject = getHeader(headers, "Subject");
@@ -308,44 +278,34 @@ async function fetchLatestGmailCode(overrideQuery = "") {
     const bodyText = extractTextFromPayload(msg.payload);
     const senderDomain = extractEmailDomain(from);
     
-    if (senderDomain && senderBlocklist.includes(senderDomain)) {
-      continue;
-    }
+    if (senderDomain && senderBlocklist.includes(senderDomain)) continue;
 
-    const code =
-      findOtpCode(subject) ||
-      findOtpCode(snippet) ||
-      findOtpCode(bodyText);
-      
+    const code = findOtpCode(subject) || findOtpCode(snippet) || findOtpCode(bodyText);
     const senderBonus = senderDomain && senderAllowlist.includes(senderDomain) ? 3 : 0;
     
     if (!code) {
       if (containsOtpKeywords(subject) || containsOtpKeywords(snippet)) {
-        unmatched.push({
-          id: item.id,
-          from,
-          subject,
-          date,
-          snippet,
-          domain: senderDomain || ""
-        });
+        unmatched.push({ id: item.id, from, subject, date, snippet, domain: senderDomain || "" });
       }
       continue;
     }
     
-    const score = scoreCodeCandidate({ code, subject, from, snippet, body: bodyText }) + senderBonus;
+    let score = scoreCodeCandidate({ code, subject, from, snippet, body: bodyText }) + senderBonus;
     
+    // Patch bonuses
+    const codeLen = code.length;
+    if (codeLen === 6 && /^\d{6}$/.test(code)) score += 3;
+    if (codeLen >= 4 && codeLen <= 8) score += 1;
+    if (bodyText && (bodyText.startsWith(code) || bodyText.endsWith(code))) score += 2;
+    if (subject && (subject.includes(code) && subject.indexOf(code) < 20)) score += 2;
+
     if (score < threshold) continue;
     
     const entry = { code, id: item.id, snippet, subject, from, date, score };
-    if (!best || entry.score > best.score) {
-      best = entry;
-    }
+    if (!best || entry.score > best.score) best = entry;
   }
 
-  if (!best) {
-    await saveUnmatchedMessages(unmatched);
-  }
+  if (!best) await saveUnmatchedMessages(unmatched);
   if (best) {
     const { score, ...result } = best;
     return result;
@@ -353,53 +313,53 @@ async function fetchLatestGmailCode(overrideQuery = "") {
   return null;
 }
 
-let lastCodeId = null;
-
 async function runGmailWatch() {
   try {
-    const stored = await new Promise((resolve) => {
-      chrome.storage.local.get([STORAGE_KEYS.email, STORAGE_KEYS.history], (data) => resolve(data || {}));
-    });
-    if (!stored[STORAGE_KEYS.email]) return;
+    const { [STORAGE_KEYS.accounts]: accounts = [], [STORAGE_KEYS.history]: history = [] } = await new Promise(resolve => 
+      chrome.storage.local.get([STORAGE_KEYS.accounts, STORAGE_KEYS.history], resolve)
+    );
+    if (!accounts.length) return;
 
-    const now = Date.now();
-    chrome.storage.local.set({ [STORAGE_KEYS.lastCheckTime]: now });
+    chrome.storage.local.set({ [STORAGE_KEYS.lastCheckTime]: Date.now() });
 
-    if (!lastCodeId) {
-      lastCodeId = await getStoredLastGmailId();
-    }
-    const codeData = await fetchLatestGmailCode();
-    if (codeData && codeData.id !== lastCodeId) {
-      lastCodeId = codeData.id;
-      await setStoredLastGmailId(lastCodeId);
-      
-      // Update history
-      let history = Array.isArray(stored[STORAGE_KEYS.history]) ? stored[STORAGE_KEYS.history] : [];
-      history = [codeData, ...history].slice(0, 10);
-      
-      chrome.storage.local.set({ 
-        [STORAGE_KEYS.lastEntry]: codeData,
-        [STORAGE_KEYS.history]: history
-      }, () => {});
+    // Iterate through all accounts
+    for (const account of accounts) {
+      try {
+        // We attempt to get a token. For secondary accounts this might fail in background 
+        // if not recently refreshed, but chrome.identity handles most of it.
+        const token = await getAuthToken(false);
+        const codeData = await fetchLatestGmailCode(token);
+        
+        if (codeData && codeData.id !== account.lastMessageId) {
+          account.lastMessageId = codeData.id;
+          codeData.account = account.email; // Tag with account email
+          
+          let newHistory = [codeData, ...history].slice(0, 10);
+          await new Promise(resolve => chrome.storage.local.set({ 
+            [STORAGE_KEYS.accounts]: accounts,
+            [STORAGE_KEYS.lastEntry]: codeData,
+            [STORAGE_KEYS.history]: newHistory
+          }, resolve));
 
-      chrome.notifications.create("gmail-otp", {
-        type: "basic",
-        iconUrl: "icons/frogus-128.png",
-        title: "Gmail OTP",
-        message: `Найден код: ${codeData.code}.`,
-        priority: 2
-      });
+          chrome.notifications.create(`otp-${account.email}`, {
+            type: "basic",
+            iconUrl: "icons/frogus-128.png",
+            title: `Gmail OTP (${account.email})`,
+            message: `Код: ${codeData.code}`,
+            priority: 2
+          });
+        }
+      } catch (err) {
+        log(`[Watch] Error for ${account.email}:`, err.message);
+      }
     }
   } catch (e) {
-    if (e && e.message === "auth_error") {
-      try {
-        const token = await getAuthToken(false);
-        if (token) await removeCachedToken(token);
-      } catch {}
-    }
-    log("[GmailWatch] Skip check:", e.message);
+    log("[GmailWatch] Global error:", e.message);
   }
 }
+
+const GMAIL_ALARM_NAME = "gmailWatch";
+const GMAIL_ALARM_MINUTES = 1;
 
 async function ensureAlarms() {
   const stored = await new Promise((resolve) => {
@@ -417,18 +377,10 @@ function updateAlarmState(mode) {
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  ensureAlarms();
-});
-
-chrome.runtime.onStartup.addListener(() => {
-  ensureAlarms();
-});
-
+chrome.runtime.onInstalled.addListener(() => ensureAlarms());
+chrome.runtime.onStartup.addListener(() => ensureAlarms());
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === GMAIL_ALARM_NAME) {
-    runGmailWatch();
-  }
+  if (alarm.name === GMAIL_ALARM_NAME) runGmailWatch();
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -453,38 +405,39 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === MSG.getLogs) {
-    chrome.storage.local.get(STORAGE_KEYS.logs, (data) => {
-      sendResponse({ logs: data[STORAGE_KEYS.logs] || [] });
-    });
+    chrome.storage.local.get(STORAGE_KEYS.logs, (data) => sendResponse({ logs: data[STORAGE_KEYS.logs] || [] }));
     return true;
   }
 
   if (message.type === MSG.clearLogs) {
-    chrome.storage.local.remove(STORAGE_KEYS.logs, () => {
-      sendResponse({ ok: true });
-    });
+    chrome.storage.local.remove(STORAGE_KEYS.logs, () => sendResponse({ ok: true }));
     return true;
   }
 
   if (message.type === MSG.connect) {
     (async () => {
       try {
-        log("Attempting to connect...");
+        log("Attempting to add account...");
         const token = await getAuthToken(true);
-        if (!token) throw new Error("Token retrieval failed (empty)");
-        log("Token retrieved, fetching profile...");
         const email = await fetchGmailProfile(token);
         if (email) {
-          log("Connected as:", email);
-          chrome.storage.local.set({ [STORAGE_KEYS.email]: email }, () => {});
+          const { [STORAGE_KEYS.accounts]: accounts = [] } = await new Promise(r => chrome.storage.local.get(STORAGE_KEYS.accounts, r));
+          if (accounts.some(a => a.email === email)) {
+            log("Account already exists:", email);
+          } else if (accounts.length >= MAX_ACCOUNTS) {
+            throw new Error(`Max ${MAX_ACCOUNTS} accounts allowed`);
+          } else {
+            accounts.push({ email, lastMessageId: null });
+            await new Promise(r => chrome.storage.local.set({ [STORAGE_KEYS.accounts]: accounts }, r));
+            log("Account added:", email);
+          }
+          sendResponse({ ok: true, email, accounts });
         } else {
-            throw new Error("Failed to fetch email from profile");
+          throw new Error("Failed to fetch email");
         }
-        sendResponse({ ok: true, email });
       } catch (error) {
-        const errStr = String(error || "failed");
         log("Connect error:", error);
-        sendResponse({ ok: false, error: errStr });
+        sendResponse({ ok: false, error: String(error.message || error) });
       }
     })();
     return true;
@@ -493,30 +446,49 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === MSG.disconnect) {
     (async () => {
       try {
-        const token = await getAuthToken(false);
+        const targetEmail = message.email;
+        const { [STORAGE_KEYS.accounts]: accounts = [] } = await new Promise(r => chrome.storage.local.get(STORAGE_KEYS.accounts, r));
+        const filtered = accounts.filter(a => a.email !== targetEmail);
+        
+        const token = await getAuthToken(false).catch(() => null);
         if (token) {
           await removeCachedToken(token);
+          await fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`).catch(() => {});
         }
-      } catch {}
-      chrome.storage.local.set({
-        [STORAGE_KEYS.email]: null,
-        [STORAGE_KEYS.lastEntry]: null,
-        [STORAGE_KEYS.lastMessageId]: null
-      }, () => {});
-      sendResponse({ ok: true });
+        
+        await new Promise(r => chrome.storage.local.set({ [STORAGE_KEYS.accounts]: filtered }, r));
+        log("Account removed:", targetEmail);
+        sendResponse({ ok: true, accounts: filtered });
+      } catch (e) {
+        log("Disconnect error:", e);
+        sendResponse({ ok: false });
+      }
     })();
     return true;
   }
 
   if (message.type === MSG.fetch) {
-    fetchLatestGmailCode(message.query || "")
-      .then((code) => {
-        if (code) {
-          chrome.storage.local.set({ [STORAGE_KEYS.lastEntry]: code }, () => {});
+    (async () => {
+      try {
+        const { [STORAGE_KEYS.accounts]: accounts = [] } = await new Promise(r => chrome.storage.local.get(STORAGE_KEYS.accounts, r));
+        if (!accounts.length) throw new Error("No accounts");
+        
+        // Manual fetch checks ALL accounts and returns the best overall code
+        let bestCode = null;
+        for (const account of accounts) {
+          const token = await getAuthToken(false).catch(() => null);
+          if (!token) continue;
+          const code = await fetchLatestGmailCode(token, message.query || "");
+          if (code && (!bestCode || code.date > bestCode.date)) {
+            bestCode = { ...code, account: account.email };
+          }
         }
-        sendResponse({ ok: !!code, code });
-      })
-      .catch((err) => sendResponse({ ok: false, error: err.message }));
+        if (bestCode) chrome.storage.local.set({ [STORAGE_KEYS.lastEntry]: bestCode });
+        sendResponse({ ok: !!bestCode, code: bestCode });
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+      }
+    })();
     return true;
   }
 

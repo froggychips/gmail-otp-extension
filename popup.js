@@ -1,6 +1,4 @@
-const gmailStatusEl = document.getElementById("gmailStatus");
 const gmailConnectBtn = document.getElementById("gmailConnect");
-const gmailDisconnectBtn = document.getElementById("gmailDisconnect");
 const gmailQueryEl = document.getElementById("gmailQuery");
 const gmailUnreadOnlyEl = document.getElementById("gmailUnreadOnly");
 const gmailFetchCodeBtn = document.getElementById("gmailFetchCode");
@@ -8,6 +6,7 @@ const gmailCodeEl = document.getElementById("gmailCode");
 const gmailMetaEl = document.getElementById("gmailMeta");
 const statusEl = document.getElementById("status");
 const lastCheckEl = document.getElementById("lastCheck");
+const lastCheckTimeEl = document.getElementById("lastCheckTime");
 const unmatchedListEl = document.getElementById("unmatchedList");
 const unmatchedClearBtn = document.getElementById("unmatchedClear");
 const historyListEl = document.getElementById("historyList");
@@ -26,6 +25,9 @@ const tabBtns = document.querySelectorAll(".tab-btn[data-tab]");
 const tabContents = document.querySelectorAll(".tabs-content");
 const toggleAdvancedBtn = document.getElementById("toggleAdvanced");
 const advancedSection = document.getElementById("advancedSection");
+const accountToggleBtn = document.getElementById("accountToggle");
+const accountDropdown = document.getElementById("accountDropdown");
+const accountListEl = document.getElementById("accountList");
 
 const I18N = {
   ru: {
@@ -36,8 +38,8 @@ const I18N = {
     disconnectOk: "Отключено", disconnectError: "Ошибка выхода", copied: "Скопировано",
     copyError: "Ошибка буфера", loadError: "Ошибка загрузки", undoOk: "Отменено",
     exportOk: "Сохранено", importOk: "Импортировано", importError: "Ошибка файла",
-    logsCleared: "Очищено", lastFound: "Последний найденный код", account: "Аккаунт",
-    connected: "Подключено", notConnected: "Не подключено", connect: "Подключить",
+    logsCleared: "Очищено", lastFound: "Последний найденный код", account: "Аккаунты",
+    connected: "Подключено", notConnected: "Не подключено", connect: "Добавить аккаунт",
     disconnect: "Отключить", mode: "Режим работы", auto: "Авто", manual: "Ручной",
     autoDesc: "Авто: проверка раз в минуту.", manualDesc: "Ручной: только при нажатии.",
     manualSearch: "Найти код вручную", historyTitle: "Последние 10 кодов",
@@ -48,7 +50,9 @@ const I18N = {
     logs: "Логи системы", refresh: "Обновить", clear: "Очистить",
     unmatched: "Неопознанные письма", undo: "Отменить", data: "Данные",
     export: "Экспорт", import: "Импорт", from: "От", subject: "Тема", date: "Дата",
-    noSubject: "(без темы)", markCode: "Это код", markNoCode: "Не код"
+    noSubject: "(без темы)", markCode: "Это код", markNoCode: "Не код",
+    profileNote: "Используется аккаунт профиля Chrome", maxAccounts: "Достигнут лимит (3 аккаунта)",
+    justChecked: "Только что проверено", checkedAgo: " мин назад", lastChecked: "Последняя проверка: "
   },
   en: {
     code: "Code", history: "History", filters: "Filters", tools: "Tools",
@@ -58,8 +62,8 @@ const I18N = {
     disconnectOk: "Disconnected", disconnectError: "Logout error", copied: "Copied",
     copyError: "Buffer error", loadError: "Load error", undoOk: "Undone",
     exportOk: "Saved", importOk: "Imported", importError: "File error",
-    logsCleared: "Cleared", lastFound: "Last found code", account: "Account",
-    connected: "Connected", notConnected: "Not connected", connect: "Connect",
+    logsCleared: "Cleared", lastFound: "Last found code", account: "Accounts",
+    connected: "Connected", notConnected: "Not connected", connect: "Add Account",
     disconnect: "Disconnect", mode: "Work Mode", auto: "Auto", manual: "Manual",
     autoDesc: "Auto: checks every minute.", manualDesc: "Manual: checks on click.",
     manualSearch: "Search manually", historyTitle: "Last 10 codes",
@@ -70,63 +74,23 @@ const I18N = {
     logs: "System Logs", refresh: "Refresh", clear: "Clear",
     unmatched: "Unmatched emails", undo: "Undo", data: "Data",
     export: "Export", import: "Import", from: "From", subject: "Subject", date: "Date",
-    noSubject: "(no subject)", markCode: "It's a code", markNoCode: "Not a code"
-  },
-  de: {
-    code: "Code", history: "Verlauf", filters: "Filter", tools: "Tools",
-    idle: "Bereit", searching: "Suche...", found: "Code gefunden", notFound: "Keine Codes",
-    searchError: "API-Fehler", lastFound: "Zuletzt gefundener Code", account: "Konto",
-    connect: "Verbinden", disconnect: "Abmelden", mode: "Modus", auto: "Auto", manual: "Manuell"
-  },
-  fr: {
-    code: "Code", history: "Historique", filters: "Filtres", tools: "Outils",
-    idle: "Prêt", searching: "Recherche...", found: "Code trouvé", notFound: "Aucun code",
-    searchError: "Erreur API", lastFound: "Dernier code trouvé", account: "Compte",
-    connect: "Connecter", disconnect: "Déconnecter", mode: "Mode", auto: "Auto", manual: "Manuel"
-  },
-  es: {
-    code: "Código", history: "Historial", filters: "Filtros", tools: "Herramientas",
-    idle: "Listo", searching: "Buscando...", found: "Código encontrado", notFound: "Sin códigos",
-    searchError: "Error de API", lastFound: "Último código encontrado", account: "Cuenta",
-    connect: "Conectar", disconnect: "Desconectar", mode: "Modo", auto: "Auto", manual: "Manual"
+    noSubject: "(no subject)", markCode: "It's a code", markNoCode: "Not a code",
+    profileNote: "Uses your Chrome Profile account", maxAccounts: "Limit reached (3 accounts)",
+    justChecked: "Just checked", checkedAgo: " min ago", lastChecked: "Last checked: "
   }
 };
 
 const userLang = (navigator.language || "en").split("-")[0];
-const T = I18N[userLang] || I18N.en;
+const T = { ...I18N.en, ...(I18N[userLang] || {}) };
 
-const TEXT = {
-  idle: T.idle,
-  searching: T.searching,
-  found: T.found,
-  notFound: T.notFound,
-  searchError: T.searchError,
-  connectInProgress: T.connectInProgress,
-  connectError: T.connectError,
-  connectOk: T.connectOk,
-  connectNeeded: T.connectNeeded,
-  disconnectInProgress: T.disconnectInProgress,
-  disconnectOk: T.disconnectOk,
-  disconnectError: T.disconnectError,
-  copied: T.copied,
-  copyError: T.copyError,
-  loadError: T.loadError,
-  undoOk: T.undoOk,
-  exportOk: T.exportOk,
-  importOk: T.importOk,
-  importError: T.importError,
-  logsCleared: T.logsCleared
-};
+const TEXT = T;
 
 function translateUI() {
   document.querySelectorAll("[data-t]").forEach(el => {
     const key = el.getAttribute("data-t");
     if (T[key]) {
-      if (el.tagName === "INPUT" && el.type === "placeholder") {
-         el.placeholder = T[key];
-      } else {
-         el.innerHTML = T[key];
-      }
+      if (el.tagName === "INPUT" && el.placeholder !== undefined) el.placeholder = T[key];
+      else el.innerHTML = T[key];
     }
   });
 }
@@ -153,12 +117,31 @@ if (toggleAdvancedBtn) {
   toggleAdvancedBtn.addEventListener("click", () => {
     const isHidden = advancedSection.style.display === "none";
     advancedSection.style.display = isHidden ? "block" : "none";
-    toggleAdvancedBtn.querySelector("span").textContent = isHidden ? "▼ Продвинутые настройки" : "▶ Продвинутые настройки";
+    toggleAdvancedBtn.querySelector("span").textContent = isHidden ? "▼ " + T.advanced : "▶ " + T.advanced;
   });
 }
 
+// Account Toggle
+if (accountToggleBtn) {
+  accountToggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    accountDropdown.classList.toggle("show");
+    accountToggleBtn.classList.toggle("active");
+  });
+}
+
+// Close dropdown on click outside
+document.addEventListener("click", () => {
+  if (accountDropdown) accountDropdown.classList.remove("show");
+  if (accountToggleBtn) accountToggleBtn.classList.remove("active");
+});
+
+if (accountDropdown) {
+  accountDropdown.addEventListener("click", (e) => e.stopPropagation());
+}
+
 let gmailEntry = null;
-let gmailEmail = "";
+let gmailAccounts = [];
 let gmailQuery = "";
 let gmailUnreadOnly = false;
 let gmailQueryTimer = null;
@@ -169,17 +152,14 @@ let gmailHistory = [];
 let gmailThreshold = 3;
 let lastAction = null;
 let gmailMode = "auto";
+const MAX_ACCOUNTS = 3;
 
 function storageGet(keys) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(keys, (data) => resolve(data || {}));
-  });
+  return new Promise((resolve) => chrome.storage.local.get(keys, (data) => resolve(data || {})));
 }
 
 function storageSet(values) {
-  return new Promise((resolve) => {
-    chrome.storage.local.set(values, () => resolve());
-  });
+  return new Promise((resolve) => chrome.storage.local.set(values, () => resolve()));
 }
 
 async function renderLogs() {
@@ -200,7 +180,7 @@ async function renderLogs() {
       return `<div class="log-entry"><span class="log-ts">[${time}]</span> ${msg}</div>`;
     }).join("");
   } catch (e) {
-    logsListEl.textContent = "Ошибка получения логов: " + String(e);
+    logsListEl.textContent = T.loadError + ": " + String(e);
   }
 }
 
@@ -226,25 +206,71 @@ function formatTime(ts) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function renderAccountList() {
+  if (!accountListEl) return;
+  accountListEl.innerHTML = "";
+  if (!gmailAccounts.length) {
+    const el = document.createElement("div");
+    el.className = "hint";
+    el.textContent = T.notConnected;
+    accountListEl.appendChild(el);
+  } else {
+    gmailAccounts.forEach(account => {
+      const el = document.createElement("div");
+      el.className = "account-item";
+      el.innerHTML = `
+        <span class="account-email">${account.email}</span>
+        <button class="remove-account" data-email="${account.email}" title="${T.disconnect}">×</button>
+      `;
+      accountListEl.appendChild(el);
+    });
+  }
+
+  document.querySelectorAll(".remove-account").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const email = e.target.getAttribute("data-email");
+      const response = await chrome.runtime.sendMessage({ type: "GMAIL_DISCONNECT", email });
+      if(response && response.accounts) {
+        gmailAccounts = response.accounts;
+        renderAccountList();
+        renderGmailPanel();
+      }
+    });
+  });
+
+  gmailConnectBtn.disabled = gmailAccounts.length >= MAX_ACCOUNTS;
+  if(gmailAccounts.length >= MAX_ACCOUNTS) {
+    gmailConnectBtn.textContent = T.maxAccounts;
+  } else {
+    gmailConnectBtn.textContent = T.connect;
+  }
+}
+
 function renderGmailPanel() {
-  if (gmailStatusEl) gmailStatusEl.textContent = gmailEmail || T.notConnected;
+  const hasAccounts = gmailAccounts.length > 0;
   if (gmailCodeEl) gmailCodeEl.textContent = gmailEntry && gmailEntry.code ? gmailEntry.code : "—";
-  if (gmailMetaEl) gmailMetaEl.textContent = formatGmailMeta(gmailEntry);
-  if (gmailDisconnectBtn) gmailDisconnectBtn.disabled = !gmailEmail;
-  if (gmailFetchCodeBtn) gmailFetchCodeBtn.disabled = !gmailEmail;
+  if (gmailMetaEl) {
+    let metaText = formatGmailMeta(gmailEntry);
+    if(gmailEntry && gmailEntry.account) {
+      metaText += ` (${gmailEntry.account})`
+    }
+    gmailMetaEl.textContent = metaText;
+  }
+  if (gmailFetchCodeBtn) gmailFetchCodeBtn.disabled = !hasAccounts;
   if (gmailUnreadOnlyEl) gmailUnreadOnlyEl.checked = !!gmailUnreadOnly;
   if (undoActionBtn) undoActionBtn.disabled = !lastAction;
   if (gmailThresholdEl) gmailThresholdEl.value = gmailThreshold;
   if (thresholdValEl) thresholdValEl.textContent = gmailThreshold;
   
+  if (accountToggleBtn) accountToggleBtn.classList.toggle("connected", hasAccounts);
+
   if (modeAutoBtn && modeManualBtn) {
     modeAutoBtn.classList.toggle("active", gmailMode === "auto");
     modeManualBtn.classList.toggle("active", gmailMode === "manual");
-    modeAutoBtn.disabled = !gmailEmail;
-    modeManualBtn.disabled = !gmailEmail;
-    if (modeHintEl) {
-      modeHintEl.textContent = gmailMode === "auto" ? T.autoDesc : T.manualDesc;
-    }
+    modeAutoBtn.disabled = !hasAccounts;
+    modeManualBtn.disabled = !hasAccounts;
+    if (modeHintEl) modeHintEl.textContent = gmailMode === "auto" ? T.autoDesc : T.manualDesc;
   }
 
   const hero = document.getElementById("gmailCodeWrapper");
@@ -284,28 +310,111 @@ function renderHistory() {
   });
 }
 
-async function fetchLatestGmailCode({ silent = false } = {}) {
-  const query = normalizeGmailQuery(gmailQueryEl ? gmailQueryEl.value : "");
-  if (!silent) setStatus(TEXT.searching);
-  if (gmailFetchCodeBtn) gmailFetchCodeBtn.disabled = true;
-  try {
-    const response = await chrome.runtime.sendMessage({ type: "GMAIL_FETCH_LAST_CODE", query });
-    if (response && response.ok) {
-      gmailEntry = response.code || null;
-      renderGmailPanel();
-      const stored = await storageGet(["gmailUnmatched", "gmailHistory", "gmailLastCheckTime"]);
-      unmatchedMessages = Array.isArray(stored.gmailUnmatched) ? stored.gmailUnmatched : [];
-      gmailHistory = Array.isArray(stored.gmailHistory) ? stored.gmailHistory : [];
-      if (lastCheckEl) lastCheckEl.textContent = formatTime(stored.gmailLastCheckTime);
-      if (!silent) setStatus(gmailEntry ? TEXT.found : TEXT.notFound);
-    } else {
-      if (!silent) setStatus(TEXT.searchError);
+function updateLastCheckTime() {
+  chrome.storage.local.get("gmailLastCheckTime", (data) => {
+    if (!lastCheckTimeEl) return;
+    const ts = data.gmailLastCheckTime;
+    if (!ts) {
+      lastCheckTimeEl.textContent = "";
+      return;
     }
-  } catch {
-    if (!silent) setStatus(TEXT.searchError);
-  } finally {
-    if (gmailFetchCodeBtn) gmailFetchCodeBtn.disabled = !gmailEmail;
+    const minutes = Math.floor((Date.now() - ts) / 60000);
+    lastCheckTimeEl.textContent = minutes === 0 
+      ? T.justChecked 
+      : `${T.lastChecked}${minutes}${T.checkedAgo}`;
+  });
+}
+
+async function fetchLatestGmailCode({ silent = false } = {}) {
+  if (gmailFetchCodeBtn) {
+    gmailFetchCodeBtn.disabled = true;
+    gmailFetchCodeBtn.innerHTML = `🔄 <span>${T.searching || "Searching..."}</span>`;
   }
+  if (!silent) {
+    setStatus(TEXT.searching);
+    if (gmailCodeEl) gmailCodeEl.textContent = "⋯";
+  }
+
+  const response = await chrome.runtime.sendMessage({ 
+    type: "GMAIL_FETCH_LAST_CODE", 
+    query: gmailQueryEl ? gmailQueryEl.value : "" 
+  });
+
+  if (response && response.ok) {
+    gmailEntry = response.code || null;
+    if (!silent) setStatus(gmailEntry ? T.found : T.notFound);
+  } else {
+    if (!silent) setStatus(T.searchError);
+  }
+
+  renderGmailPanel();
+
+  if (gmailFetchCodeBtn) {
+    gmailFetchCodeBtn.disabled = gmailAccounts.length === 0;
+    gmailFetchCodeBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <span data-t="manualSearch">${T.manualSearch}</span>
+    `;
+  }
+}
+
+function saveQueryDebounced() {
+  clearTimeout(gmailQueryTimer);
+  gmailQueryTimer = setTimeout(async () => {
+    gmailQuery = gmailQueryEl.value.trim();
+    await storageSet({ gmailQuery });
+    if (gmailAccounts.length > 0) fetchLatestGmailCode({ silent: true });
+  }, 800);
+}
+
+async function init() {
+  const stored = await storageGet([
+    "gmailAccounts", "gmailQuery", "gmailUnreadOnly", "gmailLastEntry",
+    "gmailUnmatched", "gmailSenderAllowlist", "gmailSenderBlocklist",
+    "gmailHistory", "gmailLastCheckTime", "gmailThreshold", "gmailMode"
+  ]);
+  gmailAccounts = stored.gmailAccounts || [];
+  gmailQuery = stored.gmailQuery || "newer_than:1h subject:(code OR verification OR подтверждение OR код)";
+  gmailUnreadOnly = !!stored.gmailUnreadOnly;
+  gmailEntry = stored.gmailLastEntry || null;
+  unmatchedMessages = stored.gmailUnmatched || [];
+  senderAllowlist = stored.gmailSenderAllowlist || [];
+  senderBlocklist = stored.gmailSenderBlocklist || [];
+  gmailHistory = stored.gmailHistory || [];
+  gmailThreshold = stored.gmailThreshold || 3;
+  gmailMode = stored.gmailMode || "auto";
+  
+  if (gmailQueryEl) {
+    gmailQueryEl.value = gmailQuery;
+    gmailQueryEl.addEventListener("input", saveQueryDebounced);
+  }
+  if (lastCheckEl) lastCheckEl.textContent = formatTime(stored.gmailLastCheckTime);
+  
+  translateUI();
+  renderAccountList();
+  renderGmailPanel();
+  updateLastCheckTime();
+  setInterval(updateLastCheckTime, 30000);
+  setStatus(gmailAccounts.length > 0 ? TEXT.idle : TEXT.connectNeeded);
+  if (gmailAccounts.length > 0) fetchLatestGmailCode({ silent: true });
+}
+
+if (gmailConnectBtn) {
+  gmailConnectBtn.addEventListener("click", async () => {
+    gmailConnectBtn.disabled = true;
+    setStatus(TEXT.connectInProgress);
+    const response = await chrome.runtime.sendMessage({ type: "GMAIL_CONNECT" });
+    if (response && response.ok) {
+      gmailAccounts = response.accounts;
+      setStatus(TEXT.connectOk);
+      renderAccountList();
+      renderGmailPanel();
+      fetchLatestGmailCode();
+    } else {
+      setStatus(response.error || TEXT.connectError);
+    }
+    gmailConnectBtn.disabled = gmailAccounts.length >= MAX_ACCOUNTS;
+  });
 }
 
 function renderUnmatchedList() {
@@ -318,34 +427,22 @@ function renderUnmatchedList() {
   unmatchedMessages.forEach((item) => {
     const wrapper = document.createElement("div");
     wrapper.className = "unmatched-item";
-
     const title = document.createElement("div");
     title.className = "unmatched-title";
     title.textContent = item.subject || T.noSubject;
-
     const meta = document.createElement("div");
     meta.className = "unmatched-meta";
-    const from = item.from ? String(item.from).trim() : "";
-    const date = item.date ? String(item.date).trim() : "";
-    meta.textContent = [from, date].filter(Boolean).join(" • ") || "—";
-
+    meta.textContent = `${item.from} • ${item.date}`;
     const actions = document.createElement("div");
     actions.className = "unmatched-actions";
-
     const markCode = document.createElement("button");
     markCode.className = "secondary";
     markCode.textContent = T.markCode;
-    markCode.addEventListener("click", () => {
-      markUnmatched(item, true);
-    });
-
+    markCode.addEventListener("click", () => markUnmatched(item, true));
     const markNoCode = document.createElement("button");
     markNoCode.className = "ghost";
     markNoCode.textContent = T.markNoCode;
-    markNoCode.addEventListener("click", () => {
-      markUnmatched(item, false);
-    });
-
+    markNoCode.addEventListener("click", () => markUnmatched(item, false));
     actions.appendChild(markCode);
     actions.appendChild(markNoCode);
     wrapper.appendChild(title);
@@ -355,52 +452,47 @@ function renderUnmatchedList() {
   });
 }
 
-async function init() {
-  const stored = await storageGet([
-    "gmailQuery", "gmailUnreadOnly", "gmailLastEntry", "gmailEmail",
-    "gmailUnmatched", "gmailSenderAllowlist", "gmailSenderBlocklist",
-    "gmailHistory", "gmailLastCheckTime", "gmailThreshold", "gmailMode"
-  ]);
-  gmailQuery = stored.gmailQuery || "newer_than:1h subject:(code OR verification OR подтверждение OR код)";
-  gmailUnreadOnly = !!stored.unreadOnly;
-  gmailEntry = stored.gmailLastEntry || null;
-  gmailEmail = stored.gmailEmail || "";
-  unmatchedMessages = Array.isArray(stored.gmailUnmatched) ? stored.gmailUnmatched : [];
-  senderAllowlist = Array.isArray(stored.gmailSenderAllowlist) ? stored.gmailSenderAllowlist : [];
-  senderBlocklist = Array.isArray(stored.gmailSenderBlocklist) ? stored.gmailSenderBlocklist : [];
-  gmailHistory = Array.isArray(stored.gmailHistory) ? stored.gmailHistory : [];
-  gmailThreshold = typeof stored.gmailThreshold === "number" ? stored.gmailThreshold : 3;
-  gmailMode = stored.gmailMode || "auto";
-  
-  if (gmailQueryEl) gmailQueryEl.value = gmailQuery;
-  if (lastCheckEl) lastCheckEl.textContent = formatTime(stored.gmailLastCheckTime);
-  
-  translateUI();
-  renderGmailPanel();
-  setStatus(gmailEmail ? TEXT.idle : TEXT.connectNeeded);
-  if (gmailEmail) fetchLatestGmailCode({ silent: true });
+function extractEmailAddress(from) {
+  if (!from) return "";
+  const match = String(from).match(/<([^>]+)>/);
+  if (match && match[1]) return match[1].trim().toLowerCase();
+  const direct = String(from).trim().toLowerCase();
+  return direct.includes("@") ? direct : "";
 }
 
-// Event Listeners
+function extractEmailDomain(from) {
+  const addr = extractEmailAddress(from);
+  if (!addr) return "";
+  const parts = addr.split("@");
+  return parts.length === 2 ? parts[1] : "";
+}
+
+async function markUnmatched(item, isCode) {
+  if (!item) return;
+  const domain = extractEmailDomain(item.from);
+  lastAction = { item, isCode, domain };
+  if (undoActionBtn) undoActionBtn.disabled = false;
+  if (isCode && domain && !senderAllowlist.includes(domain)) {
+    senderAllowlist = [domain, ...senderAllowlist].slice(0, 50);
+    await storageSet({ gmailSenderAllowlist: senderAllowlist });
+  }
+  if (!isCode && domain && !senderBlocklist.includes(domain)) {
+    senderBlocklist = [domain, ...senderBlocklist].slice(0, 50);
+    await storageSet({ gmailSenderBlocklist: senderBlocklist });
+  }
+  unmatchedMessages = unmatchedMessages.filter((entry) => entry.id !== item.id);
+  await storageSet({ gmailUnmatched: unmatchedMessages });
+  renderUnmatchedList();
+}
+
 if (gmailThresholdEl) {
   gmailThresholdEl.addEventListener("input", () => {
-    gmailThreshold = parseInt(gmailThresholdEl.value, 10);
-    thresholdValEl.textContent = gmailThreshold;
+    if(thresholdValEl) thresholdValEl.textContent = gmailThresholdEl.value;
   });
   gmailThresholdEl.addEventListener("change", () => {
+    gmailThreshold = parseInt(gmailThresholdEl.value, 10);
     storageSet({ gmailThreshold });
-    fetchLatestGmailCode(); // Auto-search on change
-  });
-}
-
-if (gmailQueryEl) {
-  gmailQueryEl.addEventListener("input", () => {
-    if (gmailQueryTimer) clearTimeout(gmailQueryTimer);
-    gmailQueryTimer = setTimeout(() => {
-      gmailQuery = normalizeGmailQuery(gmailQueryEl.value);
-      storageSet({ gmailQuery });
-      fetchLatestGmailCode({ silent: true });
-    }, 500);
+    fetchLatestGmailCode();
   });
 }
 
@@ -412,38 +504,7 @@ if (gmailUnreadOnlyEl) {
   });
 }
 
-if (gmailConnectBtn) {
-  gmailConnectBtn.addEventListener("click", async () => {
-    gmailConnectBtn.disabled = true;
-    setStatus(TEXT.connectInProgress);
-    const response = await chrome.runtime.sendMessage({ type: "GMAIL_CONNECT" });
-    if (response && response.ok) {
-      gmailEmail = response.email || "";
-      await storageSet({ gmailEmail });
-      setStatus(gmailEmail ? TEXT.connectOk : TEXT.connectNeeded);
-      fetchLatestGmailCode();
-    } else {
-      setStatus(TEXT.connectError);
-    }
-    gmailConnectBtn.disabled = false;
-    renderGmailPanel();
-  });
-}
-
-if (gmailDisconnectBtn) {
-  gmailDisconnectBtn.addEventListener("click", async () => {
-    await chrome.runtime.sendMessage({ type: "GMAIL_DISCONNECT" });
-    gmailEmail = "";
-    gmailEntry = null;
-    await storageSet({ gmailEmail: "", gmailLastEntry: null });
-    setStatus(TEXT.disconnectOk);
-    renderGmailPanel();
-  });
-}
-
-if (gmailFetchCodeBtn) {
-  gmailFetchCodeBtn.addEventListener("click", () => fetchLatestGmailCode());
-}
+if (gmailFetchCodeBtn) gmailFetchCodeBtn.addEventListener("click", () => fetchLatestGmailCode());
 
 if (modeAutoBtn) {
   modeAutoBtn.addEventListener("click", async () => {
@@ -464,12 +525,18 @@ if (modeManualBtn) {
 const hero = document.getElementById("gmailCodeWrapper");
 if (hero) {
   hero.addEventListener("click", async () => {
-    const code = gmailEntry && gmailEntry.code ? String(gmailEntry.code).trim() : "";
-    if (!code) return;
-    await navigator.clipboard.writeText(code);
-    setStatus(TEXT.copied);
-    hero.style.opacity = "0.7";
-    setTimeout(() => hero.style.opacity = "1", 100);
+    if (!gmailEntry || !gmailEntry.code) return;
+    try {
+      await navigator.clipboard.writeText(gmailEntry.code);
+      const original = gmailCodeEl.innerHTML;
+      gmailCodeEl.textContent = "✓ " + (T.copied || "Copied!");
+      setTimeout(() => {
+        gmailCodeEl.innerHTML = original;
+        window.close();
+      }, 800);
+    } catch (e) {
+      console.error("Copy failed");
+    }
   });
 }
 
@@ -481,4 +548,46 @@ if (clearLogsBtn) {
   });
 }
 
-init().catch(() => setStatus(TEXT.loadError));
+if (exportDataBtn) {
+  exportDataBtn.addEventListener("click", async () => {
+    const data = await storageGet(["gmailQuery", "gmailThreshold", "gmailSenderAllowlist", "gmailSenderBlocklist"]);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gmail-otp-config-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus(TEXT.exportOk);
+  });
+}
+
+if (importDataBtn) {
+  importDataBtn.addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (re) => {
+        try {
+          const data = JSON.parse(re.target.result);
+          await storageSet(data);
+          setStatus(TEXT.importOk);
+          init();
+        } catch {
+          setStatus(TEXT.importError);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  });
+}
+
+init().catch(e => {
+  console.error("Init failed", e);
+  setStatus(TEXT.loadError);
+});

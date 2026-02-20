@@ -13,9 +13,33 @@
         <div class="logo-group">
           <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail-search"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="M18 12v1"/><path d="M18 16v1"/><path d="M18 20v1"/></svg>
           <div class="title">Gmail OTP</div>
+          <button id="accountToggle" class="account-toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span id="accountIndicator" class="indicator"></span>
+          </button>
         </div>
         <div id="status" class="status-badge" data-t="idle">Готово</div>
+        <span id="lastCheckTime" style="margin-left:12px; font-size:11px; color:var(--text-secondary);"></span>
       </header>
+
+      <!-- Account Dropdown (Hidden by default) -->
+      <div id="accountDropdown" class="account-dropdown">
+        <div class="card" style="margin-bottom:0; border:none; box-shadow:none;">
+          <div class="card-title" data-t="account">Аккаунты</div>
+          
+          <div id="accountList" style="margin-bottom: 12px;">
+            <!-- Dynamic list of accounts -->
+          </div>
+
+          <div class="field-group" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px; margin-bottom:0;">
+            <button id="gmailConnect" class="btn btn-primary" data-t="connect">Добавить аккаунт</button>
+          </div>
+          
+          <div class="hint" data-t="profileNote" style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; font-size: 10px;">
+            Используется аккаунт профиля Chrome
+          </div>
+        </div>
+      </div>
 
       <!-- Navigation -->
       <nav class="tabs-nav">
@@ -39,22 +63,10 @@
 
       <!-- Content: Code -->
       <div class="tabs-content active" id="tab-code">
-        <div class="otp-hero" id="gmailCodeWrapper">
+        <div class="otp-hero" id="gmailCodeWrapper" style="cursor:pointer">
           <div class="otp-meta" data-t="lastFound">Последний найденный код</div>
           <div id="gmailCode" class="otp-code">—</div>
           <div id="gmailMeta" class="otp-meta">—</div>
-        </div>
-
-        <div class="card">
-          <div class="card-title" data-t="account">Аккаунт</div>
-          <div class="switch-row">
-            <span id="gmailStatus" class="value" data-t="notConnected">Не подключено</span>
-            <div id="lastCheck" class="last-check" style="font-size: 10px; color: var(--text-secondary);">—</div>
-          </div>
-          <div class="field-group" style="margin-top: 12px; display: flex; gap: 8px;">
-            <button id="gmailConnect" class="btn btn-primary" data-t="connect">Подключить</button>
-            <button id="gmailDisconnect" class="btn btn-ghost" data-t="disconnect">Отключить</button>
-          </div>
         </div>
 
         <div class="card">

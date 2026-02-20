@@ -32,7 +32,7 @@
     "https://gmail.googleapis.com/*"
   ],
   "oauth2": {
-    "client_id": "920198611393-j6vk0quu23vlc6mvlgj6ci1ae13b5ici.apps.googleusercontent.com",
+    "client_id": "YOUR_OWN_CLIENT_ID.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/gmail.readonly"
     ]
