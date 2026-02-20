@@ -27,7 +27,7 @@ const MAX_ACCOUNTS = 3;
 const MAX_LOG_ENTRIES = 50;
 let currentOtpCode = null;
 
-const CLIENT_ID = "629171495161-2sh2eo41d651fdtpi4r3dvrn3q5ki3oj.apps.googleusercontent.com";
+const CLIENT_ID = "629171495161-glvg17e0pshp9q15rbli2jd8b4pe4gkq.apps.googleusercontent.com";
 const SCOPES = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email";
 
 async function log(...args) {
