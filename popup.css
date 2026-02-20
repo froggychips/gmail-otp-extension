@@ -12,6 +12,57 @@
   margin-bottom: 12px;
 }
 
+.status-wrapper {
+  text-align: right;
+}
+
+.last-check {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: 8px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border: 1px solid #e5e7eb;
+}
+
+.history-item:hover {
+  background: #e5e7eb;
+}
+
+.history-code {
+  font-weight: 700;
+  font-size: 14px;
+  color: #111827;
+}
+
+.history-meta {
+  font-size: 10px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .title {
   font-weight: 700;
   font-size: 16px;
@@ -59,6 +110,12 @@ input[type="text"] {
   padding: 8px 10px;
   margin-top: 6px;
   font-size: 13px;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin: 10px 0;
+  cursor: pointer;
 }
 
 button {
@@ -141,4 +198,29 @@ button:disabled {
 .unmatched-actions {
   display: flex;
   gap: 6px;
+}
+
+.toggle-group {
+  display: flex;
+  background: #f3f4f6;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.toggle-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.toggle-btn.active {
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }

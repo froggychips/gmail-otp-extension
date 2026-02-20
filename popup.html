@@ -10,8 +10,22 @@
     <main class="app">
       <header class="header">
         <div class="title">Gmail OTP</div>
-        <div id="status" class="status">Готово</div>
+        <div class="status-wrapper">
+          <div id="status" class="status">Готово</div>
+          <div id="lastCheck" class="last-check">—</div>
+        </div>
       </header>
+
+      <section class="panel">
+        <div class="row">
+          <label class="label">Режим работы</label>
+          <div class="toggle-group">
+            <button id="modeAuto" class="toggle-btn active">Авто</button>
+            <button id="modeManual" class="toggle-btn">Ручной</button>
+          </div>
+        </div>
+        <div class="hint" id="modeHint">Авто: проверка раз в минуту. Ручной: только при нажатии на иконку.</div>
+      </section>
 
       <section class="panel">
         <div class="row">
@@ -53,11 +67,48 @@
       </section>
 
       <section class="panel">
+        <label class="label" for="gmailThreshold">Чувствительность (порог: <span id="thresholdVal">3</span>)</label>
+        <input id="gmailThreshold" type="range" min="1" max="8" value="3" step="1" />
+        <div class="hint">Меньше — больше кодов, но больше шума. Больше — строже поиск.</div>
+      </section>
+
+      <section class="panel">
+        <div class="row">
+          <div class="label">История кодов</div>
+        </div>
+        <div id="historyList" class="history-list">—</div>
+      </section>
+
+      <section class="panel">
         <div class="row">
           <div class="label">Неопознанные письма</div>
-          <button id="unmatchedClear" class="ghost">Очистить</button>
+          <div class="row-actions">
+            <button id="undoAction" class="ghost" disabled>Отменить</button>
+            <button id="unmatchedClear" class="ghost">Очистить</button>
+          </div>
         </div>
         <div id="unmatchedList" class="unmatched-list">—</div>
+      </section>
+
+      <section class="panel">
+        <div class="row">
+          <div class="label">Настройки</div>
+          <div class="row-actions">
+            <button id="exportData" class="ghost">Экспорт</button>
+            <button id="importData" class="ghost">Импорт</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="row">
+          <div class="label">Логи</div>
+          <div class="row-actions">
+            <button id="refreshLogs" class="ghost">Обновить</button>
+            <button id="clearLogs" class="ghost">Очистить</button>
+          </div>
+        </div>
+        <div id="logsList" class="logs-list" style="max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 10px; white-space: pre-wrap; word-break: break-all;">—</div>
       </section>
     </main>
     <script src="popup.js"></script>

@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Gmail OTP",
-  "version": "0.95.0",
-  "description": "Минималистичный помощник для поиска OTP-кодов в Gmail. Постепенно учится на ваших отметках.",
+  "version": "1.0.0",
+  "description": "Автоматически находит OTP-коды в Gmail и показывает их в уведомлениях или в окне расширения. Работает локально и безопасно.",
+  "homepage_url": "https://github.com/fagionpw/gmail-otp-extension",
   "action": {
     "default_title": "Gmail OTP",
     "default_popup": "popup.html",

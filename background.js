@@ -11,14 +11,54 @@ const STORAGE_KEYS = {
   lastMessageId: "gmailLastMessageId",
   unmatched: "gmailUnmatched",
   senderAllowlist: "gmailSenderAllowlist",
-  senderBlocklist: "gmailSenderBlocklist"
+  senderBlocklist: "gmailSenderBlocklist",
+  lastCheckTime: "gmailLastCheckTime",
+  history: "gmailHistory",
+  threshold: "gmailThreshold",
+  mode: "gmailMode",
+  logs: "gmailLogs"
 };
 
 const MSG = {
   connect: "GMAIL_CONNECT",
   disconnect: "GMAIL_DISCONNECT",
-  fetch: "GMAIL_FETCH_LAST_CODE"
+  fetch: "GMAIL_FETCH_LAST_CODE",
+  modeAuto: "GMAIL_MODE_AUTO",
+  modeManual: "GMAIL_MODE_MANUAL",
+  getLogs: "GMAIL_GET_LOGS",
+  clearLogs: "GMAIL_CLEAR_LOGS"
 };
+
+const MAX_LOG_ENTRIES = 50;
+
+async function log(...args) {
+  const newEntry = {
+    ts: Date.now(),
+    msg: args.map(arg => {
+      if (arg instanceof Error) {
+        return { message: arg.message, stack: arg.stack };
+      }
+      try {
+        return JSON.parse(JSON.stringify(arg));
+      } catch {
+        return String(arg);
+      }
+    })
+  };
+
+  const { [STORAGE_KEYS.logs]: logs = [] } = await new Promise(resolve =>
+    chrome.storage.local.get(STORAGE_KEYS.logs, resolve)
+  );
+
+  logs.unshift(newEntry);
+  if (logs.length > MAX_LOG_ENTRIES) {
+    logs.length = MAX_LOG_ENTRIES;
+  }
+
+  await new Promise(resolve =>
+    chrome.storage.local.set({ [STORAGE_KEYS.logs]: logs }, resolve)
+  );
+}
 
 function getAuthToken(interactive = false) {
   return new Promise((resolve, reject) => {
@@ -224,11 +264,23 @@ async function setStoredLastGmailId(id) {
 }
 
 async function fetchLatestGmailCode(overrideQuery = "") {
-  const storedQuery = normalizeQuery(await getStoredGmailQuery());
+  const stored = await new Promise((resolve) => {
+    chrome.storage.local.get([
+      STORAGE_KEYS.query,
+      STORAGE_KEYS.unreadOnly,
+      STORAGE_KEYS.senderAllowlist,
+      STORAGE_KEYS.senderBlocklist,
+      STORAGE_KEYS.threshold
+    ], (data) => resolve(data || {}));
+  });
+
+  const storedQuery = normalizeQuery(stored[STORAGE_KEYS.query]);
   const providedQuery = normalizeQuery(overrideQuery);
-  const unreadOnly = await getStoredGmailUnreadOnly();
-  const senderAllowlist = await getStoredSenderList(STORAGE_KEYS.senderAllowlist);
-  const senderBlocklist = await getStoredSenderList(STORAGE_KEYS.senderBlocklist);
+  const unreadOnly = !!stored[STORAGE_KEYS.unreadOnly];
+  const senderAllowlist = Array.isArray(stored[STORAGE_KEYS.senderAllowlist]) ? stored[STORAGE_KEYS.senderAllowlist] : [];
+  const senderBlocklist = Array.isArray(stored[STORAGE_KEYS.senderBlocklist]) ? stored[STORAGE_KEYS.senderBlocklist] : [];
+  const threshold = typeof stored[STORAGE_KEYS.threshold] === "number" ? stored[STORAGE_KEYS.threshold] : 3;
+
   const baseQuery = providedQuery || storedQuery || GMAIL_QUERY_DEFAULT;
   const extraParts = [];
   if (!/\bin:\w+/i.test(baseQuery)) extraParts.push("in:inbox");
@@ -255,14 +307,18 @@ async function fetchLatestGmailCode(overrideQuery = "") {
     const date = getHeader(headers, "Date");
     const bodyText = extractTextFromPayload(msg.payload);
     const senderDomain = extractEmailDomain(from);
+    
     if (senderDomain && senderBlocklist.includes(senderDomain)) {
       continue;
     }
+
     const code =
       findOtpCode(subject) ||
       findOtpCode(snippet) ||
       findOtpCode(bodyText);
+      
     const senderBonus = senderDomain && senderAllowlist.includes(senderDomain) ? 3 : 0;
+    
     if (!code) {
       if (containsOtpKeywords(subject) || containsOtpKeywords(snippet)) {
         unmatched.push({
@@ -276,8 +332,11 @@ async function fetchLatestGmailCode(overrideQuery = "") {
       }
       continue;
     }
+    
     const score = scoreCodeCandidate({ code, subject, from, snippet, body: bodyText }) + senderBonus;
-    if (score < 3) continue;
+    
+    if (score < threshold) continue;
+    
     const entry = { code, id: item.id, snippet, subject, from, date, score };
     if (!best || entry.score > best.score) {
       best = entry;
@@ -299,9 +358,12 @@ let lastCodeId = null;
 async function runGmailWatch() {
   try {
     const stored = await new Promise((resolve) => {
-      chrome.storage.local.get([STORAGE_KEYS.email], (data) => resolve(data || {}));
+      chrome.storage.local.get([STORAGE_KEYS.email, STORAGE_KEYS.history], (data) => resolve(data || {}));
     });
     if (!stored[STORAGE_KEYS.email]) return;
+
+    const now = Date.now();
+    chrome.storage.local.set({ [STORAGE_KEYS.lastCheckTime]: now });
 
     if (!lastCodeId) {
       lastCodeId = await getStoredLastGmailId();
@@ -310,7 +372,15 @@ async function runGmailWatch() {
     if (codeData && codeData.id !== lastCodeId) {
       lastCodeId = codeData.id;
       await setStoredLastGmailId(lastCodeId);
-      chrome.storage.local.set({ [STORAGE_KEYS.lastEntry]: codeData }, () => {});
+      
+      // Update history
+      let history = Array.isArray(stored[STORAGE_KEYS.history]) ? stored[STORAGE_KEYS.history] : [];
+      history = [codeData, ...history].slice(0, 10);
+      
+      chrome.storage.local.set({ 
+        [STORAGE_KEYS.lastEntry]: codeData,
+        [STORAGE_KEYS.history]: history
+      }, () => {});
 
       chrome.notifications.create("gmail-otp", {
         type: "basic",
@@ -327,12 +397,24 @@ async function runGmailWatch() {
         if (token) await removeCachedToken(token);
       } catch {}
     }
-    console.warn("[GmailWatch] Skip check:", e.message);
+    log("[GmailWatch] Skip check:", e.message);
   }
 }
 
-function ensureAlarms() {
-  chrome.alarms.create(GMAIL_ALARM_NAME, { periodInMinutes: GMAIL_ALARM_MINUTES });
+async function ensureAlarms() {
+  const stored = await new Promise((resolve) => {
+    chrome.storage.local.get([STORAGE_KEYS.mode], (data) => resolve(data || {}));
+  });
+  const mode = stored[STORAGE_KEYS.mode] || "auto";
+  updateAlarmState(mode);
+}
+
+function updateAlarmState(mode) {
+  if (mode === "auto") {
+    chrome.alarms.create(GMAIL_ALARM_NAME, { periodInMinutes: GMAIL_ALARM_MINUTES });
+  } else {
+    chrome.alarms.clear(GMAIL_ALARM_NAME);
+  }
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -352,17 +434,57 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || !message.type) return false;
 
+  if (message.type === MSG.modeAuto) {
+    chrome.storage.local.set({ [STORAGE_KEYS.mode]: "auto" }, () => {
+      updateAlarmState("auto");
+      log("Switched to Auto mode");
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+
+  if (message.type === MSG.modeManual) {
+    chrome.storage.local.set({ [STORAGE_KEYS.mode]: "manual" }, () => {
+      updateAlarmState("manual");
+      log("Switched to Manual mode");
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+
+  if (message.type === MSG.getLogs) {
+    chrome.storage.local.get(STORAGE_KEYS.logs, (data) => {
+      sendResponse({ logs: data[STORAGE_KEYS.logs] || [] });
+    });
+    return true;
+  }
+
+  if (message.type === MSG.clearLogs) {
+    chrome.storage.local.remove(STORAGE_KEYS.logs, () => {
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+
   if (message.type === MSG.connect) {
     (async () => {
       try {
+        log("Attempting to connect...");
         const token = await getAuthToken(true);
-        const email = token ? await fetchGmailProfile(token) : "";
+        if (!token) throw new Error("Token retrieval failed (empty)");
+        log("Token retrieved, fetching profile...");
+        const email = await fetchGmailProfile(token);
         if (email) {
+          log("Connected as:", email);
           chrome.storage.local.set({ [STORAGE_KEYS.email]: email }, () => {});
+        } else {
+            throw new Error("Failed to fetch email from profile");
         }
         sendResponse({ ok: true, email });
       } catch (error) {
-        sendResponse({ ok: false, error: String(error || "failed") });
+        const errStr = String(error || "failed");
+        log("Connect error:", error);
+        sendResponse({ ok: false, error: errStr });
       }
     })();
     return true;
