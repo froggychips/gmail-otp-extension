@@ -387,7 +387,6 @@ async function init() {
     gmailQueryEl.value = gmailQuery;
     gmailQueryEl.addEventListener("input", saveQueryDebounced);
   }
-  if (lastCheckEl) lastCheckEl.textContent = formatTime(stored.gmailLastCheckTime);
   
   translateUI();
   renderAccountList();
