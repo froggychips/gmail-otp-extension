@@ -25,6 +25,7 @@ const MSG = {
 
 const MAX_ACCOUNTS = 3;
 const MAX_LOG_ENTRIES = 50;
+let currentOtpCode = null;   // последний найденный код для контекстного меню
 
 async function log(...args) {
   const newEntry = {
@@ -338,6 +339,7 @@ async function runGmailWatch() {
         if (codeData && codeData.id !== account.lastMessageId) {
           account.lastMessageId = codeData.id;
           codeData.account = account.email; // Tag with account email
+          updateOtpContextMenu(codeData.code);   // обновляем контекстное меню
           
           let newHistory = [codeData, ...history].slice(0, 10);
           await new Promise(resolve => chrome.storage.local.set({ 
@@ -381,6 +383,20 @@ function updateAlarmState(mode) {
   } else {
     chrome.alarms.clear(GMAIL_ALARM_NAME);
   }
+}
+
+// === CONTEXT MENU ===
+function updateOtpContextMenu(code) {
+  if (!code) return;
+  currentOtpCode = code;
+
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "pasteOtp",
+      title: `Вставить OTP: ${code}`,
+      contexts: ["editable", "password", "text", "search", "tel", "url", "number"]
+    });
+  });
 }
 
 chrome.runtime.onInstalled.addListener(() => ensureAlarms());
@@ -499,4 +515,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   return false;
+});
+
+// === КЛИК ПО КОНТЕКСТНОМУ МЕНЮ ===
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "pasteOtp" && currentOtpCode && tab?.id) {
+    chrome.tabs.sendMessage(tab.id, {
+      action: "PASTE_OTP",
+      code: currentOtpCode
+    });
+  }
 });
