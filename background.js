@@ -57,9 +57,11 @@ async function gmailApiRequest(path, token) {
     headers: { "Authorization": `Bearer ${token}` }
   });
   if (!res.ok) {
+    const errorBody = await res.text().catch(() => "no body");
+    await log(`Gmail API Error [${res.status}]:`, errorBody);
     if (res.status === 401 || res.status === 403) throw new Error("auth_error");
     if (res.status === 429) {
-      log("Gmail rate limit (429). Waiting 60 seconds...");
+      await log("Gmail rate limit (429). Waiting 60 seconds...");
       await new Promise(r => setTimeout(r, 60000));
       throw new Error("rate_limit");
     }
@@ -69,7 +71,7 @@ async function gmailApiRequest(path, token) {
 }
 
 async function fetchGmailProfile(token) {
-  const data = await gmailApiRequest("profile", { token });
+  const data = await gmailApiRequest("profile", token);
   return data && data.emailAddress ? data.emailAddress : "";
 }
 
@@ -439,27 +441,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === MSG.connect) {
     (async () => {
       try {
-        log("Attempting to add account...");
+        const currentId = chrome.runtime.id;
+        await log("Starting connect flow. Extension ID:", currentId);
+        await log("Attempting to add account...");
         const token = await getAuthToken(true);
+        if (!token) throw new Error("No token returned");
+        
+        await log("Token received, fetching profile...");
         const email = await fetchGmailProfile(token);
         if (email) {
           const { [STORAGE_KEYS.accounts]: accounts = [] } = await new Promise(r => chrome.storage.local.get(STORAGE_KEYS.accounts, r));
           if (accounts.some(a => a.email === email)) {
-            log("Account already exists:", email);
+            await log("Account already exists:", email);
           } else if (accounts.length >= MAX_ACCOUNTS) {
             throw new Error(`Max ${MAX_ACCOUNTS} accounts allowed`);
           } else {
             accounts.push({ email, lastMessageId: null });
             await new Promise(r => chrome.storage.local.set({ [STORAGE_KEYS.accounts]: accounts }, r));
-            log("Account added:", email);
+            await log("Account added:", email);
           }
           sendResponse({ ok: true, email, accounts });
         } else {
           throw new Error("Failed to fetch email");
         }
       } catch (error) {
-        log("Connect error:", error);
-        sendResponse({ ok: false, error: String(error.message || error) });
+        const errMsg = error.message || String(error);
+        await log("Connect error:", errMsg);
+        sendResponse({ ok: false, error: errMsg });
       }
     })();
     return true;

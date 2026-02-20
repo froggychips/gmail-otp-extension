@@ -14,6 +14,7 @@ const gmailThresholdEl = document.getElementById("gmailThreshold");
 const thresholdValEl = document.getElementById("thresholdVal");
 const exportDataBtn = document.getElementById("exportData");
 const importDataBtn = document.getElementById("importData");
+const resetExtensionBtn = document.getElementById("resetExtension");
 const modeAutoBtn = document.getElementById("modeAuto");
 const modeManualBtn = document.getElementById("modeManual");
 const modeHintEl = document.getElementById("modeHint");
@@ -51,7 +52,8 @@ const I18N = {
     export: "Экспорт", import: "Импорт", from: "От", subject: "Тема", date: "Дата",
     noSubject: "(без темы)", markCode: "Это код", markNoCode: "Не код",
     profileNote: "Используется аккаунт профиля Chrome", maxAccounts: "Достигнут лимит (3 аккаунта)",
-    justChecked: "Только что проверено", checkedAgo: " мин назад", lastChecked: "Последняя проверка: "
+    justChecked: "Только что проверено", checkedAgo: " мин назад", lastChecked: "Последняя проверка: ",
+    reset: "Сбросить всё", resetConfirm: "Вы уверены? Это удалит все настройки и аккаунты."
   },
   en: {
     code: "Code", history: "History", filters: "Filters", tools: "Tools",
@@ -75,7 +77,8 @@ const I18N = {
     export: "Export", import: "Import", from: "From", subject: "Subject", date: "Date",
     noSubject: "(no subject)", markCode: "It's a code", markNoCode: "Not a code",
     profileNote: "Uses your Chrome Profile account", maxAccounts: "Limit reached (3 accounts)",
-    justChecked: "Just checked", checkedAgo: " min ago", lastChecked: "Last checked: "
+    justChecked: "Just checked", checkedAgo: " min ago", lastChecked: "Last checked: ",
+    reset: "Reset All", resetConfirm: "Are you sure? This will delete all settings and accounts."
   }
 };
 
@@ -582,6 +585,22 @@ if (importDataBtn) {
       reader.readAsText(file);
     };
     input.click();
+  });
+}
+
+if (resetExtensionBtn) {
+  resetExtensionBtn.addEventListener("click", async () => {
+    if (!confirm(T.resetConfirm)) return;
+    
+    // Clear all accounts tokens
+    for (const acc of gmailAccounts) {
+      try {
+        await chrome.runtime.sendMessage({ type: "GMAIL_DISCONNECT", email: acc.email });
+      } catch (e) {}
+    }
+    
+    await new Promise(resolve => chrome.storage.local.clear(resolve));
+    window.location.reload();
   });
 }
 
