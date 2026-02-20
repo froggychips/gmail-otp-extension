@@ -13,13 +13,14 @@
         <div class="logo-group">
           <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail-search"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="M18 12v1"/><path d="M18 16v1"/><path d="M18 20v1"/></svg>
           <div class="title">Gmail OTP</div>
+        </div>
+        <div class="header-right" style="display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; overflow: hidden;">
+          <div id="accountScroller" class="account-scroller" style="font-size: 10px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; text-align: right; transition: opacity 0.3s;"></div>
           <button id="accountToggle" class="account-toggle">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             <span id="accountIndicator" class="indicator"></span>
           </button>
         </div>
-        <div id="status" class="status-badge" data-t="idle">Готово</div>
-        <span id="lastCheckTime" style="margin-left:12px; font-size:11px; color:var(--text-secondary);"></span>
       </header>
 
       <!-- Account Dropdown (Hidden by default) -->

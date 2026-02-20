@@ -4,8 +4,6 @@ const gmailUnreadOnlyEl = document.getElementById("gmailUnreadOnly");
 const gmailFetchCodeBtn = document.getElementById("gmailFetchCode");
 const gmailCodeEl = document.getElementById("gmailCode");
 const gmailMetaEl = document.getElementById("gmailMeta");
-const statusEl = document.getElementById("status");
-const lastCheckTimeEl = document.getElementById("lastCheckTime");
 const unmatchedListEl = document.getElementById("unmatchedList");
 const unmatchedClearBtn = document.getElementById("unmatchedClear");
 const historyListEl = document.getElementById("historyList");
@@ -28,6 +26,7 @@ const advancedSection = document.getElementById("advancedSection");
 const accountToggleBtn = document.getElementById("accountToggle");
 const accountDropdown = document.getElementById("accountDropdown");
 const accountListEl = document.getElementById("accountList");
+const accountScrollerEl = document.getElementById("accountScroller");
 
 const I18N = {
   ru: {
@@ -155,6 +154,8 @@ let gmailThreshold = 3;
 let lastAction = null;
 let gmailMode = "auto";
 const MAX_ACCOUNTS = 3;
+let currentAccountIndex = 0;
+let accountScrollerTimer = null;
 
 function storageGet(keys) {
   return new Promise((resolve) => chrome.storage.local.get(keys, (data) => resolve(data || {})));
@@ -208,6 +209,42 @@ function formatTime(ts) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function updateAccountScroller() {
+  if (!accountScrollerEl) return;
+  if (accountScrollerTimer) clearTimeout(accountScrollerTimer);
+
+  if (!gmailAccounts.length) {
+    accountScrollerEl.textContent = "";
+    return;
+  }
+
+  const showNext = () => {
+    if (!gmailAccounts.length) return;
+    accountScrollerEl.style.opacity = "0";
+    
+    setTimeout(() => {
+      currentAccountIndex = (currentAccountIndex + 1) % gmailAccounts.length;
+      accountScrollerEl.textContent = gmailAccounts[currentAccountIndex].email;
+      accountScrollerEl.style.opacity = "1";
+    }, 300);
+
+    accountScrollerTimer = setTimeout(showNext, 4000);
+  };
+
+  // Initial show
+  if (gmailAccounts[currentAccountIndex]) {
+    accountScrollerEl.textContent = gmailAccounts[currentAccountIndex].email;
+    accountScrollerEl.style.opacity = "1";
+  } else {
+    currentAccountIndex = 0;
+    if (gmailAccounts[0]) accountScrollerEl.textContent = gmailAccounts[0].email;
+  }
+
+  if (gmailAccounts.length > 1) {
+    accountScrollerTimer = setTimeout(showNext, 4000);
+  }
+}
+
 function renderAccountList() {
   if (!accountListEl) return;
   accountListEl.innerHTML = "";
@@ -232,11 +269,15 @@ function renderAccountList() {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
       const email = e.target.getAttribute("data-email");
-      const response = await chrome.runtime.sendMessage({ type: "GMAIL_DISCONNECT", email });
-      if(response && response.accounts) {
-        gmailAccounts = response.accounts;
-        renderAccountList();
-        renderGmailPanel();
+      try {
+        const response = await sendMessageWithTimeout({ type: "GMAIL_DISCONNECT", email });
+        if(response && response.accounts) {
+          gmailAccounts = response.accounts;
+          renderAccountList();
+          renderGmailPanel();
+        }
+      } catch (err) {
+        console.error("Disconnect failed:", err);
       }
     });
   });
@@ -247,6 +288,7 @@ function renderAccountList() {
   } else {
     gmailConnectBtn.textContent = T.connect;
   }
+  updateAccountScroller();
 }
 
 function renderGmailPanel() {
@@ -312,18 +354,25 @@ function renderHistory() {
   });
 }
 
-function updateLastCheckTime() {
-  chrome.storage.local.get("gmailLastCheckTime", (data) => {
-    if (!lastCheckTimeEl) return;
-    const ts = data.gmailLastCheckTime;
-    if (!ts) {
-      lastCheckTimeEl.textContent = "";
-      return;
-    }
-    const minutes = Math.floor((Date.now() - ts) / 60000);
-    lastCheckTimeEl.textContent = minutes === 0 
-      ? T.justChecked 
-      : `${T.lastChecked}${minutes}${T.checkedAgo}`;
+function setStatus(text) {
+  // Status badge was removed from UI to reduce clutter.
+  // We can log this to internal logs if needed, but not to the main UI.
+}
+
+async function sendMessageWithTimeout(message, timeout = 10000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("Timeout waiting for response"));
+    }, timeout);
+
+    chrome.runtime.sendMessage(message, (response) => {
+      clearTimeout(timer);
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve(response);
+      }
+    });
   });
 }
 
@@ -333,20 +382,22 @@ async function fetchLatestGmailCode({ silent = false } = {}) {
     gmailFetchCodeBtn.innerHTML = `🔄 <span>${T.searching || "Searching..."}</span>`;
   }
   if (!silent) {
-    setStatus(TEXT.searching);
     if (gmailCodeEl) gmailCodeEl.textContent = "⋯";
   }
 
-  const response = await chrome.runtime.sendMessage({ 
-    type: "GMAIL_FETCH_LAST_CODE", 
-    query: gmailQueryEl ? gmailQueryEl.value : "" 
-  });
+  try {
+    const response = await sendMessageWithTimeout({ 
+      type: "GMAIL_FETCH_LAST_CODE", 
+      query: gmailQueryEl ? gmailQueryEl.value : "" 
+    });
 
-  if (response && response.ok) {
-    gmailEntry = response.code || null;
-    if (!silent) setStatus(gmailEntry ? T.found : T.notFound);
-  } else {
-    if (!silent) setStatus(T.searchError);
+    if (response && response.ok) {
+      gmailEntry = response.code || null;
+    } else if (response && response.error) {
+      console.warn("Fetch error:", response.error);
+    }
+  } catch (err) {
+    console.error("Fetch failed:", err);
   }
 
   renderGmailPanel();
@@ -394,25 +445,24 @@ async function init() {
   translateUI();
   renderAccountList();
   renderGmailPanel();
-  updateLastCheckTime();
-  setInterval(updateLastCheckTime, 30000);
-  setStatus(gmailAccounts.length > 0 ? TEXT.idle : TEXT.connectNeeded);
   if (gmailAccounts.length > 0) fetchLatestGmailCode({ silent: true });
 }
 
 if (gmailConnectBtn) {
   gmailConnectBtn.addEventListener("click", async () => {
     gmailConnectBtn.disabled = true;
-    setStatus(TEXT.connectInProgress);
-    const response = await chrome.runtime.sendMessage({ type: "GMAIL_CONNECT" });
-    if (response && response.ok) {
-      gmailAccounts = response.accounts;
-      setStatus(TEXT.connectOk);
-      renderAccountList();
-      renderGmailPanel();
-      fetchLatestGmailCode();
-    } else {
-      setStatus(response.error || TEXT.connectError);
+    try {
+      const response = await sendMessageWithTimeout({ type: "GMAIL_CONNECT" });
+      if (response && response.ok) {
+        gmailAccounts = response.accounts;
+        renderAccountList();
+        renderGmailPanel();
+        fetchLatestGmailCode();
+      } else if (response && response.error) {
+        console.warn("Connection error:", response.error);
+      }
+    } catch (err) {
+      console.error("Connection failed:", err);
     }
     gmailConnectBtn.disabled = gmailAccounts.length >= MAX_ACCOUNTS;
   });
