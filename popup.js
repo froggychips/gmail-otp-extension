@@ -1,9 +1,13 @@
+import { STORAGE_KEYS, MSG, MAX_ACCOUNTS } from './src/shared/constants.js';
+import { VALIDATORS } from './src/shared/validators.js';
+
 const gmailConnectBtn = document.getElementById("gmailConnect");
 const gmailQueryEl = document.getElementById("gmailQuery");
 const gmailUnreadOnlyEl = document.getElementById("gmailUnreadOnly");
 const gmailFetchCodeBtn = document.getElementById("gmailFetchCode");
 const gmailCodeEl = document.getElementById("gmailCode");
 const gmailMetaEl = document.getElementById("gmailMeta");
+const lastCheckTimeEl = document.getElementById("lastCheckTime");
 const unmatchedListEl = document.getElementById("unmatchedList");
 const unmatchedClearBtn = document.getElementById("unmatchedClear");
 const historyListEl = document.getElementById("historyList");
@@ -153,96 +157,58 @@ let gmailHistory = [];
 let gmailThreshold = 3;
 let lastAction = null;
 let gmailMode = "auto";
-const MAX_ACCOUNTS = 3;
 let currentAccountIndex = 0;
 let accountScrollerTimer = null;
 
-function storageGet(keys) {
-  return new Promise((resolve) => chrome.storage.local.get(keys, (data) => resolve(data || {})));
-}
-
-function storageSet(values) {
-  return new Promise((resolve) => chrome.storage.local.set(values, () => resolve()));
+async function sendMessageWithTimeout(message, timeout = 10000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Timeout waiting for response")), timeout);
+    chrome.runtime.sendMessage(message, (response) => {
+      clearTimeout(timer);
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve(response);
+    });
+  });
 }
 
 async function renderLogs() {
   if (!logsListEl) return;
   try {
-    const response = await chrome.runtime.sendMessage({ type: "GMAIL_GET_LOGS" });
+    const response = await sendMessageWithTimeout({ type: MSG.getLogs });
     const logs = response && Array.isArray(response.logs) ? response.logs : [];
-    if (!logs.length) {
-      logsListEl.textContent = "—";
-      return;
-    }
+    if (!logs.length) { logsListEl.textContent = "—"; return; }
     logsListEl.innerHTML = logs.map(entry => {
       const time = new Date(entry.ts).toLocaleTimeString();
-      const msg = entry.msg.map(m => {
-        if (typeof m === 'object' && m.message) return `${m.message}`;
-        return JSON.stringify(m);
-      }).join(" ");
+      const msg = entry.msg.map(m => typeof m === 'object' && m.message ? m.message : JSON.stringify(m)).join(" ");
       return `<div class="log-entry"><span class="log-ts">[${time}]</span> ${msg}</div>`;
     }).join("");
-  } catch (e) {
-    logsListEl.textContent = T.loadError + ": " + String(e);
-  }
-}
-
-function normalizeGmailQuery(value) {
-  const trimmed = String(value || "").trim();
-  return trimmed;
+  } catch (e) { logsListEl.textContent = T.loadError + ": " + e.message; }
 }
 
 function formatGmailMeta(entry) {
   if (!entry) return "—";
-  const from = entry.from ? String(entry.from).trim() : "";
-  const date = entry.date ? String(entry.date).trim() : "";
-  return from ? `${T.from}: ${from} • ${T.date}: ${date}` : date;
-}
-
-function setStatus(text) {
-  if (statusEl) statusEl.textContent = text || TEXT.idle;
-}
-
-function formatTime(ts) {
-  if (!ts) return "—";
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return `${T.from}: ${entry.from || "unknown"} • ${T.date}: ${entry.date || "unknown"}`;
 }
 
 function updateAccountScroller() {
   if (!accountScrollerEl) return;
   if (accountScrollerTimer) clearTimeout(accountScrollerTimer);
-
-  if (!gmailAccounts.length) {
-    accountScrollerEl.textContent = "";
-    return;
-  }
+  if (!gmailAccounts.length) { accountScrollerEl.textContent = ""; return; }
 
   const showNext = () => {
     if (!gmailAccounts.length) return;
     accountScrollerEl.style.opacity = "0";
-    
     setTimeout(() => {
       currentAccountIndex = (currentAccountIndex + 1) % gmailAccounts.length;
       accountScrollerEl.textContent = gmailAccounts[currentAccountIndex].email;
       accountScrollerEl.style.opacity = "1";
     }, 300);
-
     accountScrollerTimer = setTimeout(showNext, 4000);
   };
 
-  // Initial show
-  if (gmailAccounts[currentAccountIndex]) {
-    accountScrollerEl.textContent = gmailAccounts[currentAccountIndex].email;
-    accountScrollerEl.style.opacity = "1";
-  } else {
-    currentAccountIndex = 0;
-    if (gmailAccounts[0]) accountScrollerEl.textContent = gmailAccounts[0].email;
-  }
-
-  if (gmailAccounts.length > 1) {
-    accountScrollerTimer = setTimeout(showNext, 4000);
-  }
+  accountScrollerEl.textContent = gmailAccounts[currentAccountIndex]?.email || gmailAccounts[0].email;
+  accountScrollerEl.style.opacity = "1";
+  if (gmailAccounts.length > 1) accountScrollerTimer = setTimeout(showNext, 4000);
 }
 
 function renderAccountList() {
@@ -250,17 +216,13 @@ function renderAccountList() {
   accountListEl.innerHTML = "";
   if (!gmailAccounts.length) {
     const el = document.createElement("div");
-    el.className = "hint";
-    el.textContent = T.notConnected;
+    el.className = "hint"; el.textContent = T.notConnected;
     accountListEl.appendChild(el);
   } else {
     gmailAccounts.forEach(account => {
       const el = document.createElement("div");
       el.className = "account-item";
-      el.innerHTML = `
-        <span class="account-email">${account.email}</span>
-        <button class="remove-account" data-email="${account.email}" title="${T.disconnect}">×</button>
-      `;
+      el.innerHTML = `<span class="account-email">${account.email}</span><button class="remove-account" data-email="${account.email}">×</button>`;
       accountListEl.appendChild(el);
     });
   }
@@ -270,35 +232,23 @@ function renderAccountList() {
       e.stopPropagation();
       const email = e.target.getAttribute("data-email");
       try {
-        const response = await sendMessageWithTimeout({ type: "GMAIL_DISCONNECT", email });
-        if(response && response.accounts) {
-          gmailAccounts = response.accounts;
-          renderAccountList();
-          renderGmailPanel();
-        }
-      } catch (err) {
-        console.error("Disconnect failed:", err);
-      }
+        const response = await sendMessageWithTimeout({ type: MSG.disconnect, email });
+        if (response?.ok) { gmailAccounts = response.accounts; renderAccountList(); renderGmailPanel(); }
+      } catch (err) { console.error("Disconnect failed:", err); }
     });
   });
 
   gmailConnectBtn.disabled = gmailAccounts.length >= MAX_ACCOUNTS;
-  if(gmailAccounts.length >= MAX_ACCOUNTS) {
-    gmailConnectBtn.textContent = T.maxAccounts;
-  } else {
-    gmailConnectBtn.textContent = T.connect;
-  }
+  gmailConnectBtn.textContent = gmailAccounts.length >= MAX_ACCOUNTS ? T.maxAccounts : T.connect;
   updateAccountScroller();
 }
 
 function renderGmailPanel() {
   const hasAccounts = gmailAccounts.length > 0;
-  if (gmailCodeEl) gmailCodeEl.textContent = gmailEntry && gmailEntry.code ? gmailEntry.code : "—";
+  if (gmailCodeEl) gmailCodeEl.textContent = gmailEntry?.code || "—";
   if (gmailMetaEl) {
     let metaText = formatGmailMeta(gmailEntry);
-    if(gmailEntry && gmailEntry.account) {
-      metaText += ` (${gmailEntry.account})`
-    }
+    if (gmailEntry?.account) metaText += ` (${gmailEntry.account})`;
     gmailMetaEl.textContent = metaText;
   }
   if (gmailFetchCodeBtn) gmailFetchCodeBtn.disabled = !hasAccounts;
@@ -306,7 +256,6 @@ function renderGmailPanel() {
   if (undoActionBtn) undoActionBtn.disabled = !lastAction;
   if (gmailThresholdEl) gmailThresholdEl.value = gmailThreshold;
   if (thresholdValEl) thresholdValEl.textContent = gmailThreshold;
-  
   if (accountToggleBtn) accountToggleBtn.classList.toggle("connected", hasAccounts);
 
   if (modeAutoBtn && modeManualBtn) {
@@ -319,123 +268,66 @@ function renderGmailPanel() {
 
   const hero = document.getElementById("gmailCodeWrapper");
   if (hero) {
-    if (gmailEntry && gmailEntry.code) {
-      hero.style.background = "linear-gradient(135deg, #2563eb, #3b82f6)";
-      hero.style.color = "white";
-    } else {
-      hero.style.background = "var(--bg-secondary)";
-      hero.style.color = "var(--text-secondary)";
-    }
+    hero.style.background = gmailEntry?.code ? "linear-gradient(135deg, #2563eb, #3b82f6)" : "var(--bg-secondary)";
+    hero.style.color = gmailEntry?.code ? "white" : "var(--text-secondary)";
   }
 }
 
 function renderHistory() {
   if (!historyListEl) return;
-  if (!gmailHistory || !gmailHistory.length) {
-    historyListEl.innerHTML = `<div class="list-item">${T.empty}</div>`;
-    return;
-  }
+  if (!gmailHistory.length) { historyListEl.innerHTML = `<div class="list-item">${T.empty}</div>`; return; }
   historyListEl.innerHTML = "";
   gmailHistory.forEach((item) => {
     const el = document.createElement("div");
     el.className = "list-item history-item";
-    el.innerHTML = `
-      <div class="history-info">
-        <div class="history-title">${item.subject || T.noSubject}</div>
-        <div class="history-sub">${item.from} • ${item.date}</div>
-      </div>
-      <div class="history-val">${item.code}</div>
-    `;
-    el.addEventListener("click", () => {
-      navigator.clipboard.writeText(item.code);
-      setStatus(TEXT.copied);
-    });
+    el.innerHTML = `<div class="history-info"><div class="history-title">${item.subject || T.noSubject}</div><div class="history-sub">${item.from} • ${item.date}</div></div><div class="history-val">${item.code}</div>`;
+    el.addEventListener("click", () => navigator.clipboard.writeText(item.code));
     historyListEl.appendChild(el);
-  });
-}
-
-function setStatus(text) {
-  // Status badge was removed from UI to reduce clutter.
-  // We can log this to internal logs if needed, but not to the main UI.
-}
-
-async function sendMessageWithTimeout(message, timeout = 10000) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error("Timeout waiting for response"));
-    }, timeout);
-
-    chrome.runtime.sendMessage(message, (response) => {
-      clearTimeout(timer);
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-      } else {
-        resolve(response);
-      }
-    });
   });
 }
 
 async function fetchLatestGmailCode({ silent = false } = {}) {
   if (gmailFetchCodeBtn) {
     gmailFetchCodeBtn.disabled = true;
-    gmailFetchCodeBtn.innerHTML = `🔄 <span>${T.searching || "Searching..."}</span>`;
+    gmailFetchCodeBtn.innerHTML = `🔄 <span>${T.searching}</span>`;
   }
-  if (!silent) {
-    if (gmailCodeEl) gmailCodeEl.textContent = "⋯";
-  }
+  if (!silent && gmailCodeEl) gmailCodeEl.textContent = "⋯";
 
   try {
-    const response = await sendMessageWithTimeout({ 
-      type: "GMAIL_FETCH_LAST_CODE", 
-      query: gmailQueryEl ? gmailQueryEl.value : "" 
-    });
-
-    if (response && response.ok) {
-      gmailEntry = response.code || null;
-    } else if (response && response.error) {
-      console.warn("Fetch error:", response.error);
-    }
-  } catch (err) {
-    console.error("Fetch failed:", err);
-  }
+    const response = await sendMessageWithTimeout({ type: MSG.fetch, query: gmailQueryEl?.value || "" });
+    if (response?.ok) { gmailEntry = response.code || null; }
+  } catch (err) { console.error("Fetch failed:", err); }
 
   renderGmailPanel();
-
   if (gmailFetchCodeBtn) {
     gmailFetchCodeBtn.disabled = gmailAccounts.length === 0;
-    gmailFetchCodeBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-      <span data-t="manualSearch">${T.manualSearch}</span>
-    `;
+    gmailFetchCodeBtn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg><span data-t="manualSearch">${T.manualSearch}</span>`;
   }
 }
 
 function saveQueryDebounced() {
   clearTimeout(gmailQueryTimer);
   gmailQueryTimer = setTimeout(async () => {
-    gmailQuery = gmailQueryEl.value.trim();
-    await storageSet({ gmailQuery });
-    if (gmailAccounts.length > 0) fetchLatestGmailCode({ silent: true });
+    try {
+      gmailQuery = VALIDATORS.gmailQuery(gmailQueryEl.value);
+      await chrome.storage.local.set({ [STORAGE_KEYS.query]: gmailQuery });
+      if (gmailAccounts.length > 0) fetchLatestGmailCode({ silent: true });
+    } catch (e) { console.warn(e.message); }
   }, 800);
 }
 
 async function init() {
-  const stored = await storageGet([
-    "gmailAccounts", "gmailQuery", "gmailUnreadOnly", "gmailLastEntry",
-    "gmailUnmatched", "gmailSenderAllowlist", "gmailSenderBlocklist",
-    "gmailHistory", "gmailLastCheckTime", "gmailThreshold", "gmailMode"
-  ]);
-  gmailAccounts = stored.gmailAccounts || [];
-  gmailQuery = stored.gmailQuery || "newer_than:1h subject:(code OR verification OR подтверждение OR код)";
-  gmailUnreadOnly = !!stored.gmailUnreadOnly;
-  gmailEntry = stored.gmailLastEntry || null;
-  unmatchedMessages = stored.gmailUnmatched || [];
-  senderAllowlist = stored.gmailSenderAllowlist || [];
-  senderBlocklist = stored.gmailSenderBlocklist || [];
-  gmailHistory = stored.gmailHistory || [];
-  gmailThreshold = stored.gmailThreshold || 3;
-  gmailMode = stored.gmailMode || "auto";
+  const stored = await new Promise(r => chrome.storage.local.get(null, r));
+  gmailAccounts = stored[STORAGE_KEYS.accounts] || [];
+  gmailQuery = stored[STORAGE_KEYS.query] || "";
+  gmailUnreadOnly = !!stored[STORAGE_KEYS.unreadOnly];
+  gmailEntry = stored[STORAGE_KEYS.lastEntry] || null;
+  unmatchedMessages = stored[STORAGE_KEYS.unmatched] || [];
+  senderAllowlist = stored[STORAGE_KEYS.senderAllowlist] || [];
+  senderBlocklist = stored[STORAGE_KEYS.senderBlocklist] || [];
+  gmailHistory = stored[STORAGE_KEYS.history] || [];
+  gmailThreshold = stored[STORAGE_KEYS.threshold] || 3;
+  gmailMode = stored[STORAGE_KEYS.mode] || "auto";
   
   if (gmailQueryEl) {
     gmailQueryEl.value = gmailQuery;
@@ -452,97 +344,30 @@ if (gmailConnectBtn) {
   gmailConnectBtn.addEventListener("click", async () => {
     gmailConnectBtn.disabled = true;
     try {
-      const response = await sendMessageWithTimeout({ type: "GMAIL_CONNECT" });
-      if (response && response.ok) {
-        gmailAccounts = response.accounts;
-        renderAccountList();
-        renderGmailPanel();
-        fetchLatestGmailCode();
-      } else if (response && response.error) {
-        console.warn("Connection error:", response.error);
-      }
-    } catch (err) {
-      console.error("Connection failed:", err);
-    }
+      const response = await sendMessageWithTimeout({ type: MSG.connect });
+      if (response?.ok) { gmailAccounts = response.accounts; renderAccountList(); renderGmailPanel(); fetchLatestGmailCode(); }
+    } catch (err) { console.error("Connection failed:", err); }
     gmailConnectBtn.disabled = gmailAccounts.length >= MAX_ACCOUNTS;
   });
 }
 
 function renderUnmatchedList() {
   if (!unmatchedListEl) return;
-  if (!unmatchedMessages.length) {
-    unmatchedListEl.textContent = "—";
-    return;
-  }
+  if (!unmatchedMessages.length) { unmatchedListEl.textContent = "—"; return; }
   unmatchedListEl.innerHTML = "";
   unmatchedMessages.forEach((item) => {
     const wrapper = document.createElement("div");
     wrapper.className = "unmatched-item";
-    const title = document.createElement("div");
-    title.className = "unmatched-title";
-    title.textContent = item.subject || T.noSubject;
-    const meta = document.createElement("div");
-    meta.className = "unmatched-meta";
-    meta.textContent = `${item.from} • ${item.date}`;
-    const actions = document.createElement("div");
-    actions.className = "unmatched-actions";
-    const markCode = document.createElement("button");
-    markCode.className = "secondary";
-    markCode.textContent = T.markCode;
-    markCode.addEventListener("click", () => markUnmatched(item, true));
-    const markNoCode = document.createElement("button");
-    markNoCode.className = "ghost";
-    markNoCode.textContent = T.markNoCode;
-    markNoCode.addEventListener("click", () => markUnmatched(item, false));
-    actions.appendChild(markCode);
-    actions.appendChild(markNoCode);
-    wrapper.appendChild(title);
-    wrapper.appendChild(meta);
-    wrapper.appendChild(actions);
+    wrapper.innerHTML = `<div class="unmatched-title">${item.subject || T.noSubject}</div><div class="unmatched-meta">${item.from} • ${item.date}</div><div class="unmatched-actions"><button class="secondary">${T.markCode}</button><button class="ghost">${T.markNoCode}</button></div>`;
     unmatchedListEl.appendChild(wrapper);
   });
 }
 
-function extractEmailAddress(from) {
-  if (!from) return "";
-  const match = String(from).match(/<([^>]+)>/);
-  if (match && match[1]) return match[1].trim().toLowerCase();
-  const direct = String(from).trim().toLowerCase();
-  return direct.includes("@") ? direct : "";
-}
-
-function extractEmailDomain(from) {
-  const addr = extractEmailAddress(from);
-  if (!addr) return "";
-  const parts = addr.split("@");
-  return parts.length === 2 ? parts[1] : "";
-}
-
-async function markUnmatched(item, isCode) {
-  if (!item) return;
-  const domain = extractEmailDomain(item.from);
-  lastAction = { item, isCode, domain };
-  if (undoActionBtn) undoActionBtn.disabled = false;
-  if (isCode && domain && !senderAllowlist.includes(domain)) {
-    senderAllowlist = [domain, ...senderAllowlist].slice(0, 50);
-    await storageSet({ gmailSenderAllowlist: senderAllowlist });
-  }
-  if (!isCode && domain && !senderBlocklist.includes(domain)) {
-    senderBlocklist = [domain, ...senderBlocklist].slice(0, 50);
-    await storageSet({ gmailSenderBlocklist: senderBlocklist });
-  }
-  unmatchedMessages = unmatchedMessages.filter((entry) => entry.id !== item.id);
-  await storageSet({ gmailUnmatched: unmatchedMessages });
-  renderUnmatchedList();
-}
-
 if (gmailThresholdEl) {
-  gmailThresholdEl.addEventListener("input", () => {
-    if(thresholdValEl) thresholdValEl.textContent = gmailThresholdEl.value;
-  });
+  gmailThresholdEl.addEventListener("input", () => { if (thresholdValEl) thresholdValEl.textContent = gmailThresholdEl.value; });
   gmailThresholdEl.addEventListener("change", () => {
-    gmailThreshold = parseInt(gmailThresholdEl.value, 10);
-    storageSet({ gmailThreshold });
+    gmailThreshold = VALIDATORS.threshold(gmailThresholdEl.value);
+    chrome.storage.local.set({ [STORAGE_KEYS.threshold]: gmailThreshold });
     fetchLatestGmailCode();
   });
 }
@@ -550,112 +375,50 @@ if (gmailThresholdEl) {
 if (gmailUnreadOnlyEl) {
   gmailUnreadOnlyEl.addEventListener("change", () => {
     gmailUnreadOnly = !!gmailUnreadOnlyEl.checked;
-    storageSet({ gmailUnreadOnly });
+    chrome.storage.local.set({ [STORAGE_KEYS.unreadOnly]: gmailUnreadOnly });
     fetchLatestGmailCode();
   });
 }
 
 if (gmailFetchCodeBtn) gmailFetchCodeBtn.addEventListener("click", () => fetchLatestGmailCode());
 
-if (modeAutoBtn) {
-  modeAutoBtn.addEventListener("click", async () => {
-    gmailMode = "auto";
-    await chrome.runtime.sendMessage({ type: "GMAIL_MODE_AUTO" });
-    renderGmailPanel();
-  });
-}
+if (modeAutoBtn) modeAutoBtn.addEventListener("click", () => {
+  gmailMode = "auto";
+  sendMessageWithTimeout({ type: MSG.modeAuto }).then(() => renderGmailPanel());
+});
 
-if (modeManualBtn) {
-  modeManualBtn.addEventListener("click", async () => {
-    gmailMode = "manual";
-    await chrome.runtime.sendMessage({ type: "GMAIL_MODE_MANUAL" });
-    renderGmailPanel();
-  });
-}
+if (modeManualBtn) modeManualBtn.addEventListener("click", () => {
+  gmailMode = "manual";
+  sendMessageWithTimeout({ type: MSG.modeManual }).then(() => renderGmailPanel());
+});
 
 const hero = document.getElementById("gmailCodeWrapper");
 if (hero) {
   hero.addEventListener("click", async () => {
-    if (!gmailEntry || !gmailEntry.code) return;
+    if (!gmailEntry?.code) return;
     try {
       await navigator.clipboard.writeText(gmailEntry.code);
       const original = gmailCodeEl.innerHTML;
       gmailCodeEl.textContent = "✓ " + (T.copied || "Copied!");
-      setTimeout(() => {
-        gmailCodeEl.innerHTML = original;
-        window.close();
-      }, 800);
-    } catch (e) {
-      console.error("Copy failed");
-    }
+      setTimeout(() => { gmailCodeEl.innerHTML = original; window.close(); }, 800);
+    } catch (e) { console.error("Copy failed"); }
   });
 }
 
 if (refreshLogsBtn) refreshLogsBtn.addEventListener("click", () => renderLogs());
-if (clearLogsBtn) {
-  clearLogsBtn.addEventListener("click", async () => {
-    await chrome.runtime.sendMessage({ type: "GMAIL_CLEAR_LOGS" });
-    renderLogs();
-  });
-}
-
-if (exportDataBtn) {
-  exportDataBtn.addEventListener("click", async () => {
-    const data = await storageGet(["gmailQuery", "gmailThreshold", "gmailSenderAllowlist", "gmailSenderBlocklist"]);
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `gmail-otp-config-${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setStatus(TEXT.exportOk);
-  });
-}
-
-if (importDataBtn) {
-  importDataBtn.addEventListener("click", () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async (re) => {
-        try {
-          const data = JSON.parse(re.target.result);
-          await storageSet(data);
-          setStatus(TEXT.importOk);
-          init();
-        } catch {
-          setStatus(TEXT.importError);
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  });
-}
+if (clearLogsBtn) clearLogsBtn.addEventListener("click", () => sendMessageWithTimeout({ type: MSG.clearLogs }).then(() => renderLogs()));
 
 if (resetExtensionBtn) {
   resetExtensionBtn.addEventListener("click", async () => {
     if (!confirm(T.resetConfirm)) return;
-    
-    // Clear all accounts tokens
-    for (const acc of gmailAccounts) {
-      try {
-        await chrome.runtime.sendMessage({ type: "GMAIL_DISCONNECT", email: acc.email });
-      } catch (e) {}
-    }
-    
-    await new Promise(resolve => chrome.storage.local.clear(resolve));
+    for (const acc of gmailAccounts) await sendMessageWithTimeout({ type: MSG.disconnect, email: acc.email }).catch(() => {});
+    await new Promise(r => chrome.storage.local.clear(r));
     window.location.reload();
   });
 }
 
 init().catch(e => {
   console.error("Init failed", e);
-  setStatus(TEXT.loadError || "Ошибка загрузки");
-  if (statusEl) statusEl.style.color = "var(--danger)";
+  const statusBadge = document.getElementById("status");
+  if (statusBadge) { statusBadge.textContent = T.loadError; statusBadge.style.color = "var(--danger)"; }
 });

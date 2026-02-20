@@ -45,7 +45,8 @@
     "extension_pages": "script-src 'self'; object-src 'self';"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -57,7 +58,7 @@
         "https://accounts.google.com/*",
         "https://myaccount.google.com/*"
       ],
-      "js": ["content.js"],
+      "js": ["src/content/index.js"],
       "run_at": "document_idle"
     }
   ]
