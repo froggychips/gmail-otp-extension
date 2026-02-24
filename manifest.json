@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Gmail OTP",
-  "version": "1.1.3",
-  "description": "Автоматически находит OTP-коды в Gmail и вставляет их в 1 клик. Безопасно и локально.",
+  "name": "__MSG_extensionName__",
+  "version": "1.1.4",
+  "description": "__MSG_extensionDescription__",
   "homepage_url": "https://github.com/fagionpw/gmail-otp-extension",
+  "default_locale": "ru",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzrE6RcT5kvj9qzfwsaimcvcXtw9LjMyHJhQdCx6wRy89Q0XBGQissFnOB10+gXFZF6HWkOFRa4hLhFndXt6gSniKvKr/WqNVxSdQ2MJxV9pfO3Rs3DhldBlQV3CjGEpDcvEazVErlPJKuq+EjEYcSVihSvWOi41a9bK6c3vysf8egnZfHsfH8xDRWaeyhqUMSl11n7c4I/Iib7zXeK/zS/mBrzMxYjh2+BkzgzFH2aviylNsNnjhUv+PXclTbwOpU2B5IKiA6uQt4paykBJJ7TIH2+qIf14xBTF/HPM9N/iEdAtWok/o8k7Of6blxSvm/CGj7tGiNHLpdLjBvU3BjQIDAQAB",
   "action": {
-    "default_title": "Gmail OTP",
+    "default_title": "__MSG_extensionName__",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/frogus-16.png",

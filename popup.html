@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Gmail OTP</title>
+    <title>__MSG_extensionName__</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
@@ -12,9 +12,15 @@
       <header class="header">
         <div class="header-left">
           <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="M18 12v1"/><path d="M18 16v1"/><path d="M18 20v1"/></svg>
-          <div class="title">Gmail OTP</div>
+          <div class="title">__MSG_extensionName__</div>
         </div>
         <div class="header-right">
+          <button id="themeToggle" class="icon-btn" aria-label="Toggle theme">
+            <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+          </button>
+          <button id="langToggle" class="icon-btn" aria-label="Toggle language">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m11 8 6 6"/><path d="m2 14 5 5h11l5-5"/><path d="M10 6L9 3 2 3"/><path d="m14 10 1 3 7 0"/></svg>
+          </button>
           <button id="accountToggle" class="account-toggle" aria-label="Toggle accounts">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </button>
@@ -22,9 +28,14 @@
         
         <!-- Dropdown now absolutely positioned -->
         <div id="accountDropdown" class="account-dropdown">
-          <div class="card-title" data-t="account">Аккаунты</div>
+          <div class="card-title" data-t="account">__MSG_account__</div>
           <div id="accountList"></div>
-          <button id="gmailConnect" class="btn btn-primary" style="margin-top: 12px; width: 100%;" data-t="connect">Добавить аккаунт</button>
+          <button id="gmailConnect" class="btn btn-primary" style="margin-top: 12px; width: 100%;" data-t="connect">__MSG_connect__</button>
+        </div>
+        <div id="langDropdown" class="lang-dropdown">
+          <div class="card-title">__MSG_language__</div>
+          <button class="btn btn-ghost lang-option" data-lang="en">English</button>
+          <button class="btn btn-ghost lang-option" data-lang="ru">__MSG_russian__</button>
         </div>
       </header>
 
@@ -32,19 +43,19 @@
       <nav class="tabs-nav">
         <button class="tab-btn active" data-tab="code">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <span data-t="code">Код</span>
+          <span data-t="code">__MSG_code__</span>
         </button>
         <button class="tab-btn" data-tab="history">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-          <span data-t="history">История</span>
+          <span data-t="history">__MSG_history__</span>
         </button>
         <button class="tab-btn" data-tab="filters">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-          <span data-t="filters">Фильтры</span>
+          <span data-t="filters">__MSG_filters__</span>
         </button>
         <button class="tab-btn" data-tab="tools">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span data-t="tools">Инструменты</span>
+          <span data-t="tools">__MSG_tools__</span>
         </button>
       </nav>
 
@@ -61,7 +72,7 @@
           
           <div class="hero-body">
             <div id="gmailCode" class="otp-code">—</div>
-            <div class="copy-hint" id="heroHint" data-t="clickToCopy">Нажмите, чтобы скопировать</div>
+            <div class="copy-hint" id="heroHint" data-t="clickToCopy">__MSG_clickToCopy__</div>
           </div>
 
           <div class="hero-footer">
@@ -72,18 +83,18 @@
         </div>
 
         <div class="card">
-          <div class="card-title" data-t="mode">Режим работы</div>
+          <div class="card-title" data-t="mode">__MSG_mode__</div>
           <div class="toggle-group mode-group">
-            <button id="modeAuto" class="tab-btn mode-btn active" data-t="auto">Авто</button>
-            <button id="modeManual" class="tab-btn mode-btn" data-t="manual">Ручной</button>
+            <button id="modeAuto" class="tab-btn mode-btn active" data-t="auto">__MSG_auto__</button>
+            <button id="modeManual" class="tab-btn mode-btn" data-t="manual">__MSG_manual__</button>
           </div>
-          <div class="hint mode-hint" id="modeHint" data-t="autoDesc">Авто: проверка раз в минуту.</div>
+          <div class="hint mode-hint" id="modeHint" data-t="autoDesc">__MSG_autoDesc__</div>
         </div>
         
         <div class="field-group">
           <button id="gmailFetchCode" class="btn btn-primary">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <span data-t="manualSearch">Найти код вручную</span>
+            <span data-t="manualSearch">__MSG_manualSearch__</span>
           </button>
         </div>
       </div>
@@ -91,59 +102,59 @@
       <!-- Content: History -->
       <div class="tabs-content" id="tab-history">
         <div class="card">
-          <div class="card-title" data-t="historyTitle">Последние кодов</div>
+          <div class="card-title" data-t="historyTitle">__MSG_historyTitle__</div>
           <div id="historyList" class="history-list history-list-spaced">
-            <div class="list-item" data-t="empty">Список пуст</div>
+            <div class="list-item" data-t="empty">__MSG_empty__</div>
           </div>
-          <button id="clearHistory" class="btn btn-ghost" style="width: 100%;" data-t="clearHistory">Очистить историю</button>
+          <button id="clearHistory" class="btn btn-ghost" style="width: 100%;" data-t="clearHistory">__MSG_clearHistory__</button>
         </div>
       </div>
 
       <!-- Content: Filters -->
       <div class="tabs-content" id="tab-filters">
         <div class="card">
-          <div class="card-title" data-t="searchSettings">Настройки поиска</div>
+          <div class="card-title" data-t="searchSettings">__MSG_searchSettings__</div>
           <div class="switch-row" style="display: flex; justify-content: space-between; align-items: center;">
-            <label class="field-label" for="gmailUnreadOnly" style="margin:0; font-weight: 600;" data-t="unreadOnly">Искать только в непрочитанных</label>
+            <label class="field-label" for="gmailUnreadOnly" style="margin:0; font-weight: 600;" data-t="unreadOnly">__MSG_unreadOnly__</label>
             <input id="gmailUnreadOnly" type="checkbox" />
           </div>
           <div class="hint" style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;" data-t="unreadDesc">
-            Рекомендуется: так расширение работает быстрее и точнее.
+            __MSG_unreadDesc__
           </div>
         </div>
 
         <div class="card">
           <div class="switch-row" style="display: flex; justify-content: space-between; align-items: center;">
-            <label class="field-label" style="margin:0; font-weight: 700; color: var(--text-primary);">Продвинутые настройки</label>
+            <label class="field-label" style="margin:0; font-weight: 700; color: var(--text-primary);" data-t="advancedSettings">__MSG_advancedSettings__</label>
             <input id="advancedFiltersToggle" type="checkbox" />
           </div>
         </div>
 
         <div id="advancedFiltersSection" style="display: none;">
           <div class="card">
-            <div class="card-title"><span data-t="recognition">Алгоритм распознавания</span></div>
+            <div class="card-title"><span data-t="recognition">__MSG_recognition__</span></div>
             <div class="switch-row" style="margin-bottom: 8px;">
-              <label class="field-label" style="margin:0"><span data-t="sensitivity">Чувствительность</span>: <span id="thresholdVal" style="color: var(--accent); font-weight: 700;">3</span></label>
+              <label class="field-label" style="margin:0"><span data-t="sensitivity">__MSG_sensitivity__</span>: <span id="thresholdVal" style="color: var(--accent); font-weight: 700;">3</span></label>
             </div>
             <input id="gmailThreshold" type="range" min="1" max="25" value="3" step="1" />
           </div>
 
           <div class="card">
-            <div class="card-title" data-t="rawQuery">Запрос Gmail (Query)</div>
+            <div class="card-title" data-t="rawQuery">__MSG_rawQuery__</div>
             <input id="gmailQuery" type="text" />
           </div>
 
-          <button id="resetOptimalSettings" class="btn btn-ghost" style="width: 100%; border-color: var(--accent); color: var(--accent);">Оптимальные настройки</button>
+          <button id="resetOptimalSettings" class="btn btn-ghost" style="width: 100%; border-color: var(--accent); color: var(--accent);" data-t="optimalSettings">__MSG_optimalSettings__</button>
 
           <div class="card">
-            <div class="card-title" data-t="securityTitle">Security</div>
-            <label class="field-label" for="siteAllowlistInput" style="margin-bottom: 6px;" data-t="allowlistLabel">Allowed sites for OTP paste (one domain per line)</label>
+            <div class="card-title" data-t="securityTitle">__MSG_securityTitle__</div>
+            <label class="field-label" for="siteAllowlistInput" style="margin-bottom: 6px;" data-t="allowlistLabel">__MSG_allowlistLabel__</label>
             <textarea id="siteAllowlistInput" rows="4" style="width: 100%; resize: vertical;" placeholder="example.com&#10;accounts.example.com"></textarea>
-            <div id="allowlistSummary" class="hint" style="font-size: 11px; margin-top: 6px;">All HTTPS domains allowed</div>
-            <label class="field-label" for="clipboardClearSecondsInput" style="margin-top: 10px; margin-bottom: 6px;" data-t="clipboardLabel">Clipboard auto-clear (seconds)</label>
+            <div id="allowlistSummary" class="hint" style="font-size: 11px; margin-top: 6px;" data-t="allHttpsDomainsAllowed">__MSG_allHttpsDomainsAllowed__</div>
+            <label class="field-label" for="clipboardClearSecondsInput" style="margin-top: 10px; margin-bottom: 6px;" data-t="clipboardLabel">__MSG_clipboardLabel__</label>
             <input id="clipboardClearSecondsInput" type="number" min="0" max="300" step="1" />
             <div class="hint" style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;" data-t="clipboardHint">
-              0 disables auto-clear.
+              __MSG_clipboardHint__
             </div>
             <div id="securityStatus" class="hint" style="font-size: 11px; margin-top: 8px;"></div>
           </div>
@@ -154,16 +165,16 @@
       <div class="tabs-content" id="tab-tools">
         <div class="card">
           <div class="switch-row" style="display: flex; justify-content: space-between; align-items: center;">
-            <label class="field-label" style="margin:0; font-weight: 700; color: var(--accent);">Инструменты тестирования</label>
+            <label class="field-label" style="margin:0; font-weight: 700; color: var(--accent);" data-t="testingTools">__MSG_testingTools__</label>
             <input id="testingToolsToggle" type="checkbox" />
           </div>
         </div>
 
         <div id="advancedTestSection" style="display: none;">
           <div class="card">
-            <div class="card-title">Тестирование</div>
-            <button id="testRun" class="btn btn-ghost" style="width: 100%; margin-bottom: 8px;" data-t="testRun">Глубокий тест (500 писем)</button>
-            <button id="exportFull" class="btn btn-ghost" style="width: 100%; color: #10b981; border-color: #10b981;" data-t="exportFull">Экспорт всех кодов</button>
+            <div class="card-title" data-t="testing">__MSG_testing__</div>
+            <button id="testRun" class="btn btn-ghost" style="width: 100%; margin-bottom: 8px;" data-t="testRun">__MSG_testRun__</button>
+            <button id="exportFull" class="btn btn-ghost" style="width: 100%; color: #10b981; border-color: #10b981;" data-t="exportFull">__MSG_exportFull__</button>
           </div>
 
           <div class="card">
@@ -187,7 +198,7 @@
 
         <div id="basicToolsSection">
           <div class="card">
-            <div class="card-title" data-t="data">Данные</div>
+            <div class="card-title" data-t="data">__MSG_data__</div>
             <div style="display: flex; flex-direction: column; gap: 8px;">
               <div style="display: flex; gap: 8px;">
                 <button id="exportData" class="btn btn-ghost" style="flex:1" data-t="export">Экспорт</button>

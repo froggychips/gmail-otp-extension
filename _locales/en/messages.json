@@ -1,0 +1,186 @@
+{
+  "extensionName": {
+    "message": "Gmail OTP",
+    "description": "Name of the extension."
+  },
+  "extensionDescription": {
+    "message": "Automatically finds OTP codes in Gmail and inserts them with 1 click. Secure and local.",
+    "description": "Description of the extension."
+  },
+  "account": {
+    "message": "Accounts",
+    "description": "Title for the accounts section."
+  },
+  "connect": {
+    "message": "Add Account",
+    "description": "Button to connect a Gmail account."
+  },
+  "code": {
+    "message": "Code",
+    "description": "Tab title for OTP code display."
+  },
+  "history": {
+    "message": "History",
+    "description": "Tab title for OTP history."
+  },
+  "filters": {
+    "message": "Filters",
+    "description": "Tab title for search filters."
+  },
+  "tools": {
+    "message": "Tools",
+    "description": "Tab title for utility tools."
+  },
+  "clickToCopy": {
+    "message": "Click to copy",
+    "description": "Hint for copying OTP code."
+  },
+  "mode": {
+    "message": "Operating Mode",
+    "description": "Title for operating mode section."
+  },
+  "auto": {
+    "message": "Auto",
+    "description": "Label for automatic mode."
+  },
+  "manual": {
+    "message": "Manual",
+    "description": "Label for manual mode."
+  },
+  "autoDesc": {
+    "message": "Auto: checks every minute.",
+    "description": "Description for automatic mode."
+  },
+  "manualSearch": {
+    "message": "Find code manually",
+    "description": "Button to manually search for codes."
+  },
+  "historyTitle": {
+    "message": "Latest Codes",
+    "description": "Title for OTP history section."
+  },
+  "empty": {
+    "message": "List is empty",
+    "description": "Message when a list is empty."
+  },
+  "clearHistory": {
+    "message": "Clear History",
+    "description": "Button to clear OTP history."
+  },
+  "searchSettings": {
+    "message": "Search Settings",
+    "description": "Title for search settings section."
+  },
+  "unreadOnly": {
+    "message": "Search only unread",
+    "description": "Checkbox label for searching only unread emails."
+  },
+  "unreadDesc": {
+    "message": "Recommended: faster and more accurate.",
+    "description": "Description for searching only unread emails."
+  },
+  "recognition": {
+    "message": "Recognition Algorithm",
+    "description": "Title for recognition algorithm settings."
+  },
+  "sensitivity": {
+    "message": "Sensitivity",
+    "description": "Label for recognition sensitivity slider."
+  },
+  "rawQuery": {
+    "message": "Gmail Query (Raw)",
+    "description": "Title for raw Gmail query input."
+  },
+  "optimalSettings": {
+    "message": "Optimal Settings",
+    "description": "Button to reset to optimal settings."
+  },
+  "securityTitle": {
+    "message": "Security",
+    "description": "Title for security settings section."
+  },
+  "allowlistLabel": {
+    "message": "Allowed sites for OTP paste (one domain per line)",
+    "description": "Label for site allowlist textarea."
+  },
+  "clipboardLabel": {
+    "message": "Clipboard auto-clear (seconds)",
+    "description": "Label for clipboard auto-clear input."
+  },
+  "clipboardHint": {
+    "message": "0 disables auto-clear.",
+    "description": "Hint for clipboard auto-clear setting."
+  },
+  "testRun": {
+    "message": "Deep Test (500 emails)",
+    "description": "Button for running a deep test."
+  },
+  "exportFull": {
+    "message": "Export All Codes",
+    "description": "Button to export all codes."
+  },
+  "logs": {
+    "message": "System Logs",
+    "description": "Title for system logs section."
+  },
+  "refresh": {
+    "message": "Refresh",
+    "description": "Button to refresh logs."
+  },
+  "clear": {
+    "message": "Clear",
+    "description": "Button to clear logs or unmatched items."
+  },
+  "unmatched": {
+    "message": "Unmatched Emails",
+    "description": "Title for unmatched emails section."
+  },
+  "data": {
+    "message": "Data",
+    "description": "Title for data management section."
+  },
+  "export": {
+    "message": "Export",
+    "description": "Button to export data."
+  },
+  "import": {
+    "message": "Import",
+    "description": "Button to import data."
+  },
+  "reset": {
+    "message": "Reset All",
+    "description": "Button to reset all extension data."
+  },
+  "language": {
+    "message": "Language",
+    "description": "Title for language selection."
+  },
+  "russian": {
+    "message": "Russian",
+    "description": "Language option for Russian."
+  },
+  "advancedSettings": {
+    "message": "Advanced Settings",
+    "description": "Label for advanced settings toggle."
+  },
+  "allHttpsDomainsAllowed": {
+    "message": "All HTTPS domains allowed",
+    "description": "Default text for site allowlist summary."
+  },
+  "testingTools": {
+    "message": "Testing Tools",
+    "description": "Label for testing tools toggle."
+  },
+  "testing": {
+    "message": "Testing",
+    "description": "Card title for testing section."
+  },
+  "correctCodePrompt": {
+    "message": "Correct code:",
+    "description": "Prompt for selecting the correct code in history."
+  },
+  "noOtherCodes": {
+    "message": "No other codes found in this email",
+    "description": "Message when no alternative codes are found in an email."
+  }
+}

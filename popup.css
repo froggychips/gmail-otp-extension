@@ -18,6 +18,114 @@
   --radius: 16px;
 }
 
+body.dark-theme {
+  --bg-body: #121411;
+  --bg-secondary: #1a1d18;
+  --bg-surface: #1e221c;
+  --bg-surface-hover: #252a22;
+  --text-primary: #e2e8e1;
+  --text-secondary: #a0ada0;
+  --border: rgba(226, 232, 225, 0.14);
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-float: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+
+body.dark-theme {
+  background:
+    radial-gradient(circle at 8% -10%, rgba(240, 90, 36, 0.15), transparent 44%),
+    radial-gradient(circle at 94% 8%, rgba(15, 157, 88, 0.1), transparent 34%),
+    linear-gradient(165deg, #121411 0%, #1a1d18 52%, #1e221c 100%);
+}
+
+body.dark-theme .app::before {
+  opacity: 0.03;
+  filter: invert(1);
+}
+
+body.dark-theme .header {
+  background: rgba(30, 34, 28, 0.88);
+}
+
+body.dark-theme .card,
+body.dark-theme .account-dropdown,
+body.dark-theme .lang-dropdown,
+body.dark-theme .correction-menu {
+  background: rgba(30, 34, 28, 0.94);
+}
+
+body.dark-theme input[type='text'],
+body.dark-theme input[type='number'],
+body.dark-theme textarea,
+body.dark-theme .list-item,
+body.dark-theme .unmatched-item,
+body.dark-theme .history-item,
+body.dark-theme .correction-option {
+  background: rgba(40, 45, 38, 0.72);
+  color: var(--text-primary);
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.icon-btn:hover {
+  transform: translateY(-1px);
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.icon-btn.active {
+  background: var(--text-primary);
+  color: var(--bg-surface);
+  border-color: transparent;
+}
+
+.lang-dropdown {
+  position: absolute;
+  top: 58px;
+  right: 56px;
+  width: 140px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(251, 255, 248, 0.97);
+  box-shadow: var(--shadow-float);
+  padding: 8px;
+  z-index: 80;
+  display: none;
+  animation: pop-in 0.2s ease;
+}
+
+.lang-dropdown.show {
+  display: block;
+}
+
+.lang-option {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.lang-option:last-child {
+  margin-bottom: 0;
+}
+
+
 * {
   box-sizing: border-box;
   margin: 0;

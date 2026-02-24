@@ -17,7 +17,9 @@ export const STORAGE_KEYS = {
   siteAllowlist: "gmailSiteAllowlist",
   clipboardClearSeconds: "gmailClipboardClearSeconds",
   advancedTestMode: "gmailAdvancedTestMode",
-  testingToolsMode: "gmailTestingToolsMode"
+  testingToolsMode: "gmailTestingToolsMode",
+  language: "gmailLanguage",
+  theme: "gmailTheme"
 };
 
 export const MSG = {
