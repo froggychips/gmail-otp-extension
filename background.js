@@ -149,13 +149,18 @@ function base64UrlDecode(input) {
 
 function cleanHtml(html) {
   if (!html) return "";
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ') // Remove CSS styles
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ') // Remove JS scripts
-    .replace(/<[^>]+>/g, ' ') // Replace all tags with spaces
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ') // Collapse multiple spaces
-    .trim();
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    doc.querySelectorAll("script, style, noscript, iframe, object, embed")
+      .forEach(el => el.remove());
+    return (doc.body?.textContent || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  } catch {
+    return "";
+  }
 }
 
 function extractTextFromPayload(payload) {
