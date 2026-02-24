@@ -59,6 +59,10 @@
     "message": "Последние коды",
     "description": "Заголовок раздела истории OTP."
   },
+  "searchPlaceholder": {
+    "message": "Поиск по истории...",
+    "description": "Плейсхолдер для поля поиска в истории."
+  },
   "empty": {
     "message": "Список пуст",
     "description": "Сообщение, когда список пуст."
@@ -174,6 +178,58 @@
   "testing": {
     "message": "Тестирование",
     "description": "Заголовок карточки для раздела тестирования."
+  },
+  "proTitle": {
+    "message": "Активация Pro",
+    "description": "Заголовок карточки активации Pro."
+  },
+  "proActive": {
+    "message": "Pro версия активна",
+    "description": "Текст, показывающий, что Pro версия активна."
+  },
+  "licenseKeyPlaceholder": {
+    "message": "Введите лицензионный ключ",
+    "description": "Плейсхолдер для поля ввода лицензионного ключа."
+  },
+  "activateBtn": {
+    "message": "Активировать Pro",
+    "description": "Кнопка для активации Pro версии."
+  },
+  "buyProLink": {
+    "message": "Нет ключа? Купить Pro",
+    "description": "Ссылка на покупку Pro версии."
+  },
+  "activationError": {
+    "message": "Неверный ключ",
+    "description": "Сообщение об ошибке при неверном ключе."
+  },
+  "activationSuccess": {
+    "message": "Pro функции активированы!",
+    "description": "Сообщение об успешной активации Pro."
+  },
+  "proFeaturesTitle": {
+    "message": "Премиум функции",
+    "description": "Заголовок раздела премиум функций."
+  },
+  "enableAutofill": {
+    "message": "Auto-Magic: Автозаполнение полей",
+    "description": "Опция автозаполнения полей для Pro."
+  },
+  "enableTg": {
+    "message": "Пересылка в Telegram",
+    "description": "Опция пересылки в Telegram для Pro."
+  },
+  "tgBotTokenLabel": {
+    "message": "Токен бота",
+    "description": "Лейбл для токена бота Telegram."
+  },
+  "tgChatIdLabel": {
+    "message": "ID чата",
+    "description": "Лейбл для ID чата Telegram."
+  },
+  "fastMonitor": {
+    "message": "Ускоренный мониторинг активен",
+    "description": "Статус ускоренного мониторинга."
   },
   "correctCodePrompt": {
     "message": "Правильный код:",

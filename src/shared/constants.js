@@ -19,7 +19,14 @@ export const STORAGE_KEYS = {
   advancedTestMode: "gmailAdvancedTestMode",
   testingToolsMode: "gmailTestingToolsMode",
   language: "gmailLanguage",
-  theme: "gmailTheme"
+  theme: "gmailTheme",
+  licenseKey: "gmailLicenseKey",
+  isPro: "gmailIsPro",
+  tgBotToken: "gmailTgBotToken",
+  tgChatId: "gmailTgChatId",
+  tgEnabled: "gmailTgEnabled",
+  autofillEnabled: "gmailAutofillEnabled",
+  customRules: "gmailCustomRules"
 };
 
 export const MSG = {
@@ -38,6 +45,6 @@ export const MSG = {
   ignoreCode: "GMAIL_IGNORE_CODE"
 };
 
-export const MAX_ACCOUNTS = 3;
+export const MAX_ACCOUNTS = 1;
 export const MAX_LOG_ENTRIES = 50;
 export const DEFAULT_QUERY = "newer_than:1h subject:(code OR verification OR подтверждение OR код OR Steam OR Guard OR Access OR Security OR Login OR sign-in OR OTP)";

@@ -13,6 +13,7 @@
         <div class="header-left">
           <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="M18 12v1"/><path d="M18 16v1"/><path d="M18 20v1"/></svg>
           <div class="title">__MSG_extensionName__</div>
+          <span id="proBadge" class="pro-badge" style="display: none;">PRO</span>
         </div>
         <div class="header-right">
           <button id="themeToggle" class="icon-btn" aria-label="Toggle theme">
@@ -101,6 +102,9 @@
 
       <!-- Content: History -->
       <div class="tabs-content" id="tab-history">
+        <div class="card" style="padding: 10px;">
+          <input id="historySearch" type="text" data-t="searchPlaceholder" />
+        </div>
         <div class="card">
           <div class="card-title" data-t="historyTitle">__MSG_historyTitle__</div>
           <div id="historyList" class="history-list history-list-spaced">
@@ -158,6 +162,34 @@
             </div>
             <div id="securityStatus" class="hint" style="font-size: 11px; margin-top: 8px;"></div>
           </div>
+
+          <!-- PRO ONLY SECTION -->
+          <div id="proFeaturesSection" style="display: none;">
+            <div class="card" style="border-color: var(--accent); background: rgba(240, 90, 36, 0.03);">
+              <div class="card-title" style="color: var(--accent);" data-t="proFeaturesTitle">__MSG_proFeaturesTitle__</div>
+              
+              <div class="switch-row" style="margin-bottom: 12px;">
+                <label class="field-label" style="margin:0;" data-t="enableAutofill">__MSG_enableAutofill__</label>
+                <input id="gmailAutofillToggle" type="checkbox" />
+              </div>
+
+              <div class="switch-row" style="margin-bottom: 12px;">
+                <label class="field-label" style="margin:0;" data-t="enableTg">__MSG_enableTg__</label>
+                <input id="gmailTgToggle" type="checkbox" />
+              </div>
+
+              <div id="tgSettings" style="display: none; border-top: 1px solid var(--border); padding-top: 12px;">
+                <label class="field-label" data-t="tgBotTokenLabel">__MSG_tgBotTokenLabel__</label>
+                <input id="tgBotTokenInput" type="text" placeholder="123456:ABC-DEF..." style="margin-bottom: 8px;" />
+                <label class="field-label" data-t="tgChatIdLabel">__MSG_tgChatIdLabel__</label>
+                <input id="tgChatIdInput" type="text" placeholder="123456789" />
+              </div>
+
+              <div class="hint" style="margin-top: 10px; color: var(--accent); font-weight: 600;" data-t="fastMonitor">
+                ⚡ __MSG_fastMonitor__
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -197,6 +229,20 @@
         </div>
 
         <div id="basicToolsSection">
+          <div class="card" id="proActivationCard">
+            <div class="card-title" data-t="proTitle">__MSG_proTitle__</div>
+            <div id="proActiveStatus" style="display: none; color: var(--success); font-size: 12px; margin-bottom: 8px; font-weight: 600;">
+              ✓ __MSG_proActive__
+            </div>
+            <div id="proInactiveSection">
+              <input id="licenseKeyInput" type="text" data-t="licenseKeyPlaceholder" style="margin-bottom: 8px;" />
+              <button id="activateProBtn" class="btn btn-primary" style="width: 100%;" data-t="activateBtn">__MSG_activateBtn__</button>
+              <div class="hint" style="margin-top: 8px; font-size: 10px;">
+                <a href="#" style="color: var(--accent); text-decoration: none;">__MSG_buyProLink__</a>
+              </div>
+            </div>
+          </div>
+
           <div class="card">
             <div class="card-title" data-t="data">__MSG_data__</div>
             <div style="display: flex; flex-direction: column; gap: 8px;">

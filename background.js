@@ -261,6 +261,36 @@ async function fetchLatestGmailCode(token, email = "unknown", overrideQuery = ""
   return null;
 }
 
+async function sendToTelegram(codeData) {
+  try {
+    const stored = await storageGet([STORAGE_KEYS.tgEnabled, STORAGE_KEYS.tgBotToken, STORAGE_KEYS.tgChatId, STORAGE_KEYS.isPro]);
+    if (!stored[STORAGE_KEYS.isPro] || !stored[STORAGE_KEYS.tgEnabled]) return;
+
+    const token = stored[STORAGE_KEYS.tgBotToken];
+    const chatId = stored[STORAGE_KEYS.tgChatId];
+    if (!token || !chatId) return;
+
+    const domain = codeData.domain || "Unknown";
+    const text = `🐸 *Gmail OTP*\n\n` +
+                 `📦 *Service:* ${domain}\n` +
+                 `🔑 *Code:* \`${codeData.code}\`\n\n` +
+                 `📧 *Account:* ${codeData.account}`;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        parse_mode: "MarkdownV2"
+      })
+    });
+    await log(`Forwarded code ${codeData.code} to Telegram`);
+  } catch (e) {
+    await log("Telegram forward error:", e.message);
+  }
+}
+
 async function runGmailWatch() {
   try {
     const { 
@@ -292,10 +322,13 @@ async function runGmailWatch() {
           const updatedHistory = [codeData, ...(fresh[STORAGE_KEYS.history] || [])];
           updatedHistory.sort((a, b) => parseInt(b.internalDate || 0) - parseInt(a.internalDate || 0));
 
+          const { [STORAGE_KEYS.isPro]: isProStatus } = await storageGet(STORAGE_KEYS.isPro);
+          const finalHistory = isProStatus ? updatedHistory : updatedHistory.slice(0, 50);
+
           await storageSet({ 
             [STORAGE_KEYS.accounts]: accountsToSave,
             [STORAGE_KEYS.lastEntry]: codeData,
-            [STORAGE_KEYS.history]: updatedHistory.slice(0, 50)
+            [STORAGE_KEYS.history]: finalHistory
           });
 
           chrome.notifications.create(`otp-${account.email}`, {
@@ -303,8 +336,20 @@ async function runGmailWatch() {
             title: `Gmail OTP (${account.email})`, message: `Код: ${codeData.code}`, priority: 2
           });
 
-          // Security-first behavior: do not auto-paste from background polling.
-          // User-triggered paste is still available from popup/context menu.
+          // Pro feature: Forward to Telegram
+          sendToTelegram(codeData);
+
+          // Pro feature: Auto-magic fill (send to all tabs)
+          const { [STORAGE_KEYS.isPro]: isPro, [STORAGE_KEYS.autofillEnabled]: autofill } = await storageGet([STORAGE_KEYS.isPro, STORAGE_KEYS.autofillEnabled]);
+          if (isPro && autofill) {
+            chrome.tabs.query({}, (tabs) => {
+              tabs.forEach(tab => {
+                if (tab.url?.startsWith("https://")) {
+                  chrome.tabs.sendMessage(tab.id, { action: "AUTO_MAGIC_FILL", code: codeData.code }).catch(() => {});
+                }
+              });
+            });
+          }
         }
       } catch (err) {
         if (err.message !== "Auth failed" && err.message !== "rate_limit_backoff") {
@@ -314,6 +359,20 @@ async function runGmailWatch() {
     }
   } catch (e) { await log("[GmailWatch] Global error:", e.message); }
 }
+
+// Accelerated Monitoring: trigger scan on tab switch for Pro users
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  const { [STORAGE_KEYS.isPro]: isPro } = await storageGet(STORAGE_KEYS.isPro);
+  if (isPro) {
+    // debounce to avoid spamming
+    if (!globalThis._fastScanTimer) {
+      globalThis._fastScanTimer = setTimeout(() => {
+        runGmailWatch();
+        delete globalThis._fastScanTimer;
+      }, 5000);
+    }
+  }
+});
 
 function updateAlarmState(mode) {
   if (mode === "auto") chrome.alarms.create("gmailWatch", { periodInMinutes: 1 });
@@ -554,10 +613,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === MSG.connect) {
     getAuthToken(true).then(token => fetchGmailProfile(token).then(email => {
       if (!email) throw new Error("No email");
-      return storageGet(STORAGE_KEYS.accounts).then(data => {
+      return storageGet([STORAGE_KEYS.accounts, STORAGE_KEYS.isPro]).then(data => {
         const accounts = data[STORAGE_KEYS.accounts] || [];
+        const isPro = !!data[STORAGE_KEYS.isPro];
+        const limit = isPro ? 999 : MAX_ACCOUNTS;
+
         if (accounts.some(a => a.email === email)) throw new Error("Duplicate");
-        if (accounts.length >= MAX_ACCOUNTS) throw new Error("Limit reached");
+        if (accounts.length >= limit) throw new Error("Limit reached");
         accounts.push({ email, lastMessageId: null });
         return storageSet({ [STORAGE_KEYS.accounts]: accounts }).then(() => {
           log("Account added:", email);
@@ -624,10 +686,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (!existingHistory.some(h => h.id === bestCode.id)) {
           const updatedHistory = [bestCode, ...existingHistory];
           updatedHistory.sort((a, b) => parseInt(b.internalDate || 0) - parseInt(a.internalDate || 0));
+          
+          const { [STORAGE_KEYS.isPro]: isProStatus } = await storageGet(STORAGE_KEYS.isPro);
+          const finalHistory = isProStatus ? updatedHistory : updatedHistory.slice(0, 50);
+
           await storageSet({ 
             [STORAGE_KEYS.accounts]: accountsToSave,
             [STORAGE_KEYS.lastEntry]: bestCode,
-            [STORAGE_KEYS.history]: updatedHistory.slice(0, 50)
+            [STORAGE_KEYS.history]: finalHistory
           });
         } else {
           await storageSet({ 

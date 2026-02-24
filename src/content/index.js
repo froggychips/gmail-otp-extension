@@ -121,6 +121,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     });
   }
+
+  if (message.action === "AUTO_MAGIC_FILL" && message.code) {
+    // For auto-fill, we only do it if the page is currently visible to avoid surprising the user
+    if (document.visibilityState !== 'visible') return;
+
+    const code = String(message.code);
+    const tryAutofill = () => {
+      const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="tel"], input[type="number"], input:not([type]), [contenteditable="true"]'));
+      const target = inputs.find(i => isVisibleEditable(i) && looksLikeOtpField(i));
+      if (target) {
+        doInsert(target, code);
+        return true;
+      }
+      return false;
+    };
+
+    if (!tryAutofill()) {
+      // If field not found immediately, watch for it for 10 seconds
+      const observer = new MutationObserver(() => {
+        if (tryAutofill()) observer.disconnect();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      setTimeout(() => observer.disconnect(), 10000);
+    }
+  }
   return true;
 });
 

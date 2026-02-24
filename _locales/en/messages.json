@@ -59,6 +59,10 @@
     "message": "Latest Codes",
     "description": "Title for OTP history section."
   },
+  "searchPlaceholder": {
+    "message": "Search history...",
+    "description": "Placeholder for the history search input."
+  },
   "empty": {
     "message": "List is empty",
     "description": "Message when a list is empty."
@@ -174,6 +178,58 @@
   "testing": {
     "message": "Testing",
     "description": "Card title for testing section."
+  },
+  "proTitle": {
+    "message": "Pro Activation",
+    "description": "Title for the Pro activation card."
+  },
+  "proActive": {
+    "message": "Pro Version Active",
+    "description": "Text showing that the Pro version is active."
+  },
+  "licenseKeyPlaceholder": {
+    "message": "Enter License Key",
+    "description": "Placeholder for the license key input field."
+  },
+  "activateBtn": {
+    "message": "Activate Pro",
+    "description": "Button to activate the Pro version."
+  },
+  "buyProLink": {
+    "message": "Don't have a key? Buy Pro",
+    "description": "Link to buy the Pro version."
+  },
+  "activationError": {
+    "message": "Invalid license key",
+    "description": "Error message for an invalid license key."
+  },
+  "activationSuccess": {
+    "message": "Pro features activated!",
+    "description": "Success message for Pro activation."
+  },
+  "proFeaturesTitle": {
+    "message": "Premium Features",
+    "description": "Title for the premium features section."
+  },
+  "enableAutofill": {
+    "message": "Auto-Magic: Autofill fields",
+    "description": "Autofill fields option for Pro."
+  },
+  "enableTg": {
+    "message": "Forward to Telegram",
+    "description": "Telegram forwarding option for Pro."
+  },
+  "tgBotTokenLabel": {
+    "message": "Bot Token",
+    "description": "Label for Telegram bot token."
+  },
+  "tgChatIdLabel": {
+    "message": "Chat ID",
+    "description": "Label for Telegram chat ID."
+  },
+  "fastMonitor": {
+    "message": "Accelerated monitoring active",
+    "description": "Status of accelerated monitoring."
   },
   "correctCodePrompt": {
     "message": "Correct code:",

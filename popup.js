@@ -15,6 +15,7 @@ const copyIndicatorEl = document.getElementById("copyIndicator");
 const unmatchedListEl = document.getElementById("unmatchedList");
 const unmatchedClearBtn = document.getElementById("unmatchedClear");
 const historyListEl = document.getElementById("historyList");
+const historySearchEl = document.getElementById("historySearch");
 const clearHistoryBtn = document.getElementById("clearHistory");
 const gmailThresholdEl = document.getElementById("gmailThreshold");
 const thresholdValEl = document.getElementById("thresholdVal");
@@ -49,6 +50,17 @@ const themeIconEl = document.getElementById("themeIcon");
 const langToggleBtn = document.getElementById("langToggle");
 const langDropdown = document.getElementById("langDropdown");
 const langOptionBtns = document.querySelectorAll(".lang-option");
+const proBadgeEl = document.getElementById("proBadge");
+const proActiveStatusEl = document.getElementById("proActiveStatus");
+const proInactiveSectionEl = document.getElementById("proInactiveSection");
+const licenseKeyInputEl = document.getElementById("licenseKeyInput");
+const activateProBtn = document.getElementById("activateProBtn");
+const proFeaturesSection = document.getElementById("proFeaturesSection");
+const autofillToggle = document.getElementById("gmailAutofillToggle");
+const tgToggle = document.getElementById("gmailTgToggle");
+const tgSettingsEl = document.getElementById("tgSettings");
+const tgBotTokenInput = document.getElementById("tgBotTokenInput");
+const tgChatIdInput = document.getElementById("tgChatIdInput");
 
 const TRANSLATIONS = {
   en: {
@@ -113,7 +125,14 @@ const TRANSLATIONS = {
     allowlistInvalid: "Invalid domains: ",
     processing: "Processing...",
     exportFullOk: "Export complete!",
-    testRunRunning: "Running in background..."
+    testRunRunning: "Running in background...",
+    proTitle: "Pro Activation",
+    proActive: "Pro Version Active",
+    licenseKeyPlaceholder: "Enter License Key",
+    activateBtn: "Activate Pro",
+    buyProLink: "Don't have a key? Buy Pro",
+    activationError: "Invalid license key",
+    activationSuccess: "Pro features activated!"
   },
   ru: {
     extensionName: "Gmail OTP",
@@ -177,7 +196,14 @@ const TRANSLATIONS = {
     allowlistInvalid: "Ошибки в доменах: ",
     processing: "Обработка...",
     exportFullOk: "Экспорт завершен!",
-    testRunRunning: "Выполняется в фоне..."
+    testRunRunning: "Выполняется в фоне...",
+    proTitle: "Активация Pro",
+    proActive: "Pro версия активна",
+    licenseKeyPlaceholder: "Введите лицензионный ключ",
+    activateBtn: "Активировать Pro",
+    buyProLink: "Нет ключа? Купить Pro",
+    activationError: "Неверный ключ",
+    activationSuccess: "Pro функции активированы!"
   }
 };
 
@@ -323,9 +349,75 @@ let gmailHistory = [];
 let gmailThreshold = 3;
 let lastAction = null;
 let gmailMode = "auto";
+let currentAccountIndex = 0;
 let isTestRunning = false;
+let isPro = false;
 let siteAllowlist = [];
 let clipboardClearSeconds = 20;
+
+function renderProUI() {
+  if (proBadgeEl) proBadgeEl.style.display = isPro ? "inline-block" : "none";
+  if (proActiveStatusEl) proActiveStatusEl.style.display = isPro ? "block" : "none";
+  if (proInactiveSectionEl) proInactiveSectionEl.style.display = isPro ? "none" : "block";
+  if (proFeaturesSection) proFeaturesSection.style.display = isPro ? "block" : "none";
+}
+
+if (autofillToggle) {
+  autofillToggle.addEventListener("change", () => {
+    chrome.storage.local.set({ [STORAGE_KEYS.autofillEnabled]: autofillToggle.checked });
+  });
+}
+
+if (tgToggle) {
+  tgToggle.addEventListener("change", () => {
+    const enabled = tgToggle.checked;
+    if (tgSettingsEl) tgSettingsEl.style.display = enabled ? "block" : "none";
+    chrome.storage.local.set({ [STORAGE_KEYS.tgEnabled]: enabled });
+  });
+}
+
+if (tgBotTokenInput) {
+  tgBotTokenInput.addEventListener("change", () => {
+    chrome.storage.local.set({ [STORAGE_KEYS.tgBotToken]: tgBotTokenInput.value.trim() });
+  });
+}
+
+if (tgChatIdInput) {
+  tgChatIdInput.addEventListener("change", () => {
+    chrome.storage.local.set({ [STORAGE_KEYS.tgChatId]: tgChatIdInput.value.trim() });
+  });
+}
+
+if (activateProBtn) {
+  activateProBtn.addEventListener("click", async () => {
+    const key = licenseKeyInputEl?.value?.trim();
+    if (!key) return;
+    
+    activateProBtn.disabled = true;
+    const originalText = activateProBtn.textContent;
+    activateProBtn.textContent = t("processing");
+
+    // Mock validation: Keys starting with "PRO-" are valid
+    const isValid = key.startsWith("PRO-");
+    
+    setTimeout(async () => {
+      if (isValid) {
+        isPro = true;
+        await chrome.storage.local.set({ 
+          [STORAGE_KEYS.isPro]: true,
+          [STORAGE_KEYS.licenseKey]: key
+        });
+        renderProUI();
+        renderAccountList();
+        alert(t("activationSuccess"));
+      } else {
+        alert(t("activationError"));
+      }
+      activateProBtn.disabled = false;
+      activateProBtn.textContent = originalText;
+    }, 1000);
+  });
+}
 
 function hostnameFromUrl(url) {
   try {
@@ -459,8 +551,9 @@ function renderAccountList() {
     });
   });
 
-  gmailConnectBtn.disabled = gmailAccounts.length >= MAX_ACCOUNTS;
-  gmailConnectBtn.textContent = gmailAccounts.length >= MAX_ACCOUNTS ? t("maxAccounts") : t("connect");
+  const limit = isPro ? 999 : MAX_ACCOUNTS;
+  gmailConnectBtn.disabled = gmailAccounts.length >= limit;
+  gmailConnectBtn.textContent = gmailAccounts.length >= limit ? t("maxAccounts") : t("connect");
 }
 
 function renderGmailPanel() {
@@ -615,7 +708,7 @@ function saveQueryDebounced() {
 }
 
 async function init() {
-  const storedData = await chrome.storage.local.get([STORAGE_KEYS.language, STORAGE_KEYS.theme]);
+  const storedData = await chrome.storage.local.get([STORAGE_KEYS.language, STORAGE_KEYS.theme, STORAGE_KEYS.isPro, STORAGE_KEYS.licenseKey]);
   currentLang = storedData[STORAGE_KEYS.language] || (navigator.language || "en").split("-")[0];
   if (!TRANSLATIONS[currentLang]) currentLang = "en";
   
@@ -623,7 +716,19 @@ async function init() {
   document.body.classList.toggle("dark-theme", currentTheme === "dark");
   updateThemeIcon(currentTheme);
 
+  isPro = !!storedData[STORAGE_KEYS.isPro];
+
   const stored = await new Promise(r => chrome.storage.local.get(null, r));
+  
+  if (autofillToggle) autofillToggle.checked = !!stored[STORAGE_KEYS.autofillEnabled];
+  if (tgToggle) {
+    const tgEnabled = !!stored[STORAGE_KEYS.tgEnabled];
+    tgToggle.checked = tgEnabled;
+    if (tgSettingsEl) tgSettingsEl.style.display = tgEnabled ? "block" : "none";
+  }
+  if (tgBotTokenInput) tgBotTokenInput.value = stored[STORAGE_KEYS.tgBotToken] || "";
+  if (tgChatIdInput) tgChatIdInput.value = stored[STORAGE_KEYS.tgChatId] || "";
+
   gmailAccounts = stored[STORAGE_KEYS.accounts] || [];
   gmailQuery = stored[STORAGE_KEYS.query] || "";
   gmailUnreadOnly = !!stored[STORAGE_KEYS.unreadOnly];
@@ -690,6 +795,7 @@ async function init() {
   updateAllowlistSummary();
   renderAccountList();
   renderGmailPanel();
+  renderProUI();
   if (gmailAccounts.length > 0) fetchLatestGmailCode();
 }
 
@@ -700,7 +806,8 @@ if (gmailConnectBtn) {
       const response = await sendMessageWithTimeout({ type: MSG.connect });
       if (response?.ok) { gmailAccounts = response.accounts; renderAccountList(); renderGmailPanel(); fetchLatestGmailCode(); }
     } catch (err) { console.error("Connection failed:", err); }
-    gmailConnectBtn.disabled = gmailAccounts.length >= MAX_ACCOUNTS;
+    const limit = isPro ? 999 : MAX_ACCOUNTS;
+    gmailConnectBtn.disabled = gmailAccounts.length >= limit;
   });
 }
 
