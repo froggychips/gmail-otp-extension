@@ -29,3 +29,6 @@ jobs:
 
       - name: Security validator tests
         run: node tests/test-security.js
+
+      - name: Manifest smoke tests
+        run: node tests/test-manifest.js

@@ -39,3 +39,12 @@
 1. Сайт открыт по `https://` (не `http://`).
 2. Активный домен разрешён в `Allowed sites for OTP paste` (если список не пустой).
 3. На странице есть видимое поле для OTP (по атрибутам `otp/code/pin/2fa` или `autocomplete=one-time-code`).
+
+## Quality Gates (CI)
+
+В CI запускаются:
+
+1. `node --check` для ключевых JS-модулей.
+2. `tests/test-detector.js` для OTP-распознавания.
+3. `tests/test-security.js` для security-валидаторов.
+4. `tests/test-manifest.js` для smoke-проверки security-инвариантов манифеста.
