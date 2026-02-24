@@ -47,4 +47,4 @@ export const MSG = {
 
 export const MAX_ACCOUNTS = 1;
 export const MAX_LOG_ENTRIES = 50;
-export const DEFAULT_QUERY = "newer_than:1h subject:(code OR verification OR подтверждение OR код OR Steam OR Guard OR Access OR Security OR Login OR sign-in OR OTP)";
+export const DEFAULT_QUERY = "newer_than:1h subject:(code OR verification OR подтверждение OR код OR Steam OR Guard OR Access OR Security OR Login OR sign-in OR OTP OR verify OR confirm OR активация OR подтвердите)";

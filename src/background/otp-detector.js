@@ -146,37 +146,117 @@ function scoreCandidateContext(candidate, messageData) {
   return total;
 }
 
+export function findConfirmationLink(text) {
+  if (!text) return null;
+  
+  // 1. Extract all URLs
+  const urlRegex = /https?:\/\/[^\s<>"']+ /gi;
+  const matches = text.match(urlRegex) || [];
+  if (matches.length === 0) return null;
+
+  const candidates = matches.map(url => url.trim().replace(/[.,)]+$/, ""));
+  
+  // 2. Filter and score
+  const scoring = candidates.map(url => {
+    let score = 0;
+    const lowUrl = url.toLowerCase();
+    
+    // Keywords in URL
+    if (/(confirm|verify|activate|validate|succes|approve|signin|signup|auth|register)/i.test(lowUrl)) score += 50;
+    if (/(email|user|account|token|key|code|id|hash)/i.test(lowUrl)) score += 20;
+    
+    // Negative keywords
+    if (/(unsubscribe|optout|privacy|terms|support|help|unsubscribe|facebook|twitter|linkedin|instagram|google-analytics|cdn\.)/i.test(lowUrl)) score -= 100;
+    if (lowUrl.length > 300) score -= 30; // Suspiciously long
+    
+    // Context check in text
+    const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(?:confirm|verify|activate|подтвердить|активировать|ссылке)\\s*[^\\s]{0,20}\\s*${escaped}`, "i");
+    if (regex.test(text)) score += 40;
+
+    return { url, score };
+  });
+
+  const best = scoring.sort((a, b) => b.score - a.score)[0];
+  return best && best.score > 40 ? best : null;
+}
+
 export function findBestOtpCode(messageData, settings = {}) {
   const { subject = "", from = "", snippet = "", body = "", senderDomain = "" } = messageData;
-  const { userStopWords = [], domainPrefs = {} } = settings;
+  const { userStopWords = [], domainPrefs = {}, customRules = [] } = settings;
 
+  // 1. Check Custom Rules (Pro Feature)
+  if (customRules && customRules.length > 0) {
+    const hay = `${from} ${subject} ${senderDomain}`.toLowerCase();
+    for (const rule of customRules) {
+      if (!rule.sender || !rule.regex) continue;
+      
+      const filter = rule.sender.toLowerCase();
+      if (hay.includes(filter)) {
+        try {
+          const rx = new RegExp(rule.regex, "i");
+          const fullText = [subject, snippet, body].join(" ");
+          const match = fullText.match(rx);
+          if (match && (match[1] || match[0])) {
+            const code = (match[1] || match[0]).trim();
+            if (code && code.length >= 4 && code.length <= 12) {
+              return { code, score: 1000, baseScore: 500, contextScore: 500, others: [] };
+            }
+          }
+        } catch (e) {
+          console.warn("Custom Rule execution failed:", e.message);
+        }
+      }
+    }
+  }
+
+  // 2. Link Detection (New)
   const fullText = [subject, snippet, body].join(" ");
+  const linkResult = findConfirmationLink(fullText);
+
+  // 3. Fallback to Entropy Mode for Codes
   const candidates = findOtpCode(fullText, userStopWords);
   const uniqueCandidates = [...new Set(candidates)];
 
-  if (uniqueCandidates.length === 0) return null;
+  let bestCode = null;
+  if (uniqueCandidates.length > 0) {
+    const scored = uniqueCandidates.map(code => ({
+      code,
+      baseScore: scoreCodeCandidate({
+        code, senderDomain, domainPrefs
+      }),
+      contextScore: scoreCandidateContext(code, messageData)
+    })).map(item => ({
+      code: item.code,
+      score: item.baseScore + item.contextScore,
+      baseScore: item.baseScore,
+      contextScore: item.contextScore
+    })).sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.contextScore !== a.contextScore) return b.contextScore - a.contextScore;
+      return b.baseScore - a.baseScore;
+    });
 
-  const scored = uniqueCandidates.map(code => ({
-    code,
-    baseScore: scoreCodeCandidate({
-      code, senderDomain, domainPrefs
-    }),
-    contextScore: scoreCandidateContext(code, messageData)
-  })).map(item => ({
-    code: item.code,
-    score: item.baseScore + item.contextScore,
-    baseScore: item.baseScore,
-    contextScore: item.contextScore
-  })).sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    if (b.contextScore !== a.contextScore) return b.contextScore - a.contextScore;
-    return b.baseScore - a.baseScore;
-  });
+    bestCode = scored[0];
+    bestCode.others = scored.slice(1, 10).map(s => s.code);
+  }
 
-  const best = scored[0];
-  const others = scored.slice(1, 10).map(s => s.code);
+  // Decision logic: if we have a very strong link and a weak code, or vice versa
+  if (linkResult && (!bestCode || bestCode.score < 60)) {
+    return { 
+      link: linkResult.url, 
+      score: linkResult.score, 
+      type: "link",
+      code: null,
+      others: bestCode ? [bestCode.code, ...bestCode.others] : []
+    };
+  }
 
-  return { ...best, others };
+  if (bestCode) {
+    return { ...bestCode, type: "code", link: linkResult ? linkResult.url : null };
+  }
+
+  return null;
 }
 
 export function validateGmailQuery(query) {

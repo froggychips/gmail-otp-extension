@@ -155,6 +155,10 @@
     "message": "Reset All",
     "description": "Button to reset all extension data."
   },
+  "exportHistory": {
+    "message": "Export History (CSV)",
+    "description": "Button to export history to CSV."
+  },
   "language": {
     "message": "Language",
     "description": "Title for language selection."
@@ -195,6 +199,10 @@
     "message": "Activate Pro",
     "description": "Button to activate the Pro version."
   },
+  "buyProBtn": {
+    "message": "Buy Pro License",
+    "description": "Button to buy the Pro version."
+  },
   "buyProLink": {
     "message": "Don't have a key? Buy Pro",
     "description": "Link to buy the Pro version."
@@ -230,6 +238,26 @@
   "fastMonitor": {
     "message": "Accelerated monitoring active",
     "description": "Status of accelerated monitoring."
+  },
+  "customRulesTitle": {
+    "message": "Custom Rules (Regex)",
+    "description": "Title for the custom rules section."
+  },
+  "ruleSenderPlaceholder": {
+    "message": "Sender (domain or email)",
+    "description": "Placeholder for rule sender filter."
+  },
+  "ruleRegexPlaceholder": {
+    "message": "Regular expression (regex)",
+    "description": "Placeholder for rule regex pattern."
+  },
+  "addRuleBtn": {
+    "message": "Add Rule",
+    "description": "Button to add a new custom rule."
+  },
+  "ruleDeleted": {
+    "message": "Rule deleted",
+    "description": "Notification when a rule is deleted."
   },
   "correctCodePrompt": {
     "message": "Correct code:",

@@ -155,6 +155,10 @@
     "message": "Сбросить всё",
     "description": "Кнопка для сброса всех данных расширения."
   },
+  "exportHistory": {
+    "message": "Экспорт истории (CSV)",
+    "description": "Кнопка экспорта истории в CSV."
+  },
   "language": {
     "message": "Язык",
     "description": "Заголовок для выбора языка."
@@ -195,6 +199,10 @@
     "message": "Активировать Pro",
     "description": "Кнопка для активации Pro версии."
   },
+  "buyProBtn": {
+    "message": "Купить Pro лицензию",
+    "description": "Кнопка покупки Pro версии."
+  },
   "buyProLink": {
     "message": "Нет ключа? Купить Pro",
     "description": "Ссылка на покупку Pro версии."
@@ -230,6 +238,26 @@
   "fastMonitor": {
     "message": "Ускоренный мониторинг активен",
     "description": "Статус ускоренного мониторинга."
+  },
+  "customRulesTitle": {
+    "message": "Свои правила (Regex)",
+    "description": "Заголовок раздела кастомных правил."
+  },
+  "ruleSenderPlaceholder": {
+    "message": "Отправитель (домен или email)",
+    "description": "Плейсхолдер для фильтра отправителя в правиле."
+  },
+  "ruleRegexPlaceholder": {
+    "message": "Регулярное выражение (regex)",
+    "description": "Плейсхолдер для регулярного выражения в правиле."
+  },
+  "addRuleBtn": {
+    "message": "Добавить правило",
+    "description": "Кнопка добавления нового правила."
+  },
+  "ruleDeleted": {
+    "message": "Правило удалено",
+    "description": "Уведомление об удалении правила."
   },
   "correctCodePrompt": {
     "message": "Правильный код:",

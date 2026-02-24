@@ -80,15 +80,15 @@ async function removeCachedToken(token) {
   return new Promise(resolve => chrome.identity.removeCachedAuthToken({ token }, resolve));
 }
 
-async function fetchLatestWithAuthRecovery(token, email, overrideQuery = "") {
+async function fetchLatestWithAuthRecovery(token, email, overrideQuery = "", settings = null) {
   try {
-    return await fetchLatestGmailCode(token, email, overrideQuery);
+    return await fetchLatestGmailCode(token, email, overrideQuery, settings);
   } catch (err) {
     if (err?.message !== "auth_error") throw err;
     await log(`Auth token expired for ${email}, retrying with a fresh token`);
     await removeCachedToken(token).catch(() => {});
     const freshToken = await getAuthToken(false, email);
-    return fetchLatestGmailCode(freshToken, email, overrideQuery);
+    return fetchLatestGmailCode(freshToken, email, overrideQuery, settings);
   }
 }
 
@@ -187,11 +187,11 @@ function extractTextFromPayload(payload) {
   return "";
 }
 
-async function fetchLatestGmailCode(token, email = "unknown", overrideQuery = "") {
-  const stored = await storageGet([
+async function fetchLatestGmailCode(token, email = "unknown", overrideQuery = "", providedSettings = null) {
+  const stored = providedSettings || await storageGet([
     STORAGE_KEYS.query, STORAGE_KEYS.unreadOnly, 
     STORAGE_KEYS.senderAllowlist, STORAGE_KEYS.senderBlocklist, STORAGE_KEYS.threshold,
-    STORAGE_KEYS.userStopWords, STORAGE_KEYS.domainPrefs
+    STORAGE_KEYS.userStopWords, STORAGE_KEYS.domainPrefs, STORAGE_KEYS.customRules
   ]);
 
   const threshold = stored[STORAGE_KEYS.threshold] || 3;
@@ -223,7 +223,8 @@ async function fetchLatestGmailCode(token, email = "unknown", overrideQuery = ""
       senderAllowlist: stored[STORAGE_KEYS.senderAllowlist], 
       senderBlocklist: stored[STORAGE_KEYS.senderBlocklist],
       userStopWords: stored[STORAGE_KEYS.userStopWords],
-      domainPrefs: stored[STORAGE_KEYS.domainPrefs]
+      domainPrefs: stored[STORAGE_KEYS.domainPrefs],
+      customRules: stored[STORAGE_KEYS.customRules]
     });
 
     if (!result) {
@@ -233,21 +234,21 @@ async function fetchLatestGmailCode(token, email = "unknown", overrideQuery = ""
       continue;
     }
     
-    const { code, score, others } = result;
+    const { code, score, others, type, link } = result;
 
     if (score < threshold) {
       if (score > -5) {
-        await log(`Code ${code} rejected for ${email} (Score ${score} < ${threshold})`);
+        await log(`Entry rejected for ${email} (Score ${score} < ${threshold})`);
       }
       continue;
     }
     
     const entry = { 
-      code, others, id: msg.id, snippet: msg.snippet, subject, from, 
+      code, others, type, link, id: msg.id, snippet: msg.snippet, subject, from, 
       date: getHeader(headers, "Date"), score, account: email, 
       domain: senderDomain, internalDate: msg.internalDate 
     };
-    await log(`Valid code identified for ${email}: ${code} (Score: ${score})`);
+    await log(`Valid ${type} identified for ${email}: ${code || link} (Score: ${score})`);
     
     // Found a good code! Exit early.
     return entry;
@@ -302,6 +303,11 @@ async function runGmailWatch() {
 
     await storageSet({ [STORAGE_KEYS.lastCheckTime]: Date.now() });
 
+    const settings = await storageGet([
+      STORAGE_KEYS.senderAllowlist, STORAGE_KEYS.senderBlocklist, 
+      STORAGE_KEYS.userStopWords, STORAGE_KEYS.domainPrefs, STORAGE_KEYS.customRules
+    ]);
+
     for (const account of accounts) {
       try {
         // Sequential auth to avoid Chrome Identity conflict
@@ -310,10 +316,12 @@ async function runGmailWatch() {
           new Promise((_, reject) => setTimeout(() => reject(new Error("Auth timeout")), 5000))
         ]);
 
-        const codeData = await fetchLatestWithAuthRecovery(token, account.email);
+        const codeData = await fetchLatestWithAuthRecovery(token, account.email, "", settings);
         
         if (codeData && codeData.id !== account.lastMessageId) {
-          updateOtpContextMenu(codeData.code);
+          if (codeData.type === "code") {
+            updateOtpContextMenu(codeData.code);
+          }
           const fresh = await storageGet([STORAGE_KEYS.accounts, STORAGE_KEYS.history]);
           const accountsToSave = fresh[STORAGE_KEYS.accounts] || [];
           const target = accountsToSave.find(a => a.email === account.email);
@@ -333,15 +341,17 @@ async function runGmailWatch() {
 
           chrome.notifications.create(`otp-${account.email}`, {
             type: "basic", iconUrl: "icons/frogus-128.png",
-            title: `Gmail OTP (${account.email})`, message: `Код: ${codeData.code}`, priority: 2
+            title: `Gmail OTP (${account.email})`, 
+            message: codeData.type === "link" ? "Найдена ссылка для подтверждения" : `Код: ${codeData.code}`, 
+            priority: 2
           });
 
           // Pro feature: Forward to Telegram
-          sendToTelegram(codeData);
+          if (codeData.type === "code") sendToTelegram(codeData);
 
           // Pro feature: Auto-magic fill (send to all tabs)
           const { [STORAGE_KEYS.isPro]: isPro, [STORAGE_KEYS.autofillEnabled]: autofill } = await storageGet([STORAGE_KEYS.isPro, STORAGE_KEYS.autofillEnabled]);
-          if (isPro && autofill) {
+          if (isPro && autofill && codeData.type === "code") {
             chrome.tabs.query({}, (tabs) => {
               tabs.forEach(tab => {
                 if (tab.url?.startsWith("https://")) {
@@ -401,7 +411,8 @@ chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === "gmailWatch") 
 async function performTestRun(token, email = "unknown") {
   const stored = await storageGet([
     STORAGE_KEYS.senderAllowlist, STORAGE_KEYS.senderBlocklist, STORAGE_KEYS.threshold,
-    STORAGE_KEYS.query, STORAGE_KEYS.unreadOnly, STORAGE_KEYS.userStopWords, STORAGE_KEYS.domainPrefs
+    STORAGE_KEYS.query, STORAGE_KEYS.unreadOnly, STORAGE_KEYS.userStopWords, STORAGE_KEYS.domainPrefs,
+    STORAGE_KEYS.customRules
   ]);
   const threshold = stored[STORAGE_KEYS.threshold] || 3;
   const userQuery = stored[STORAGE_KEYS.query];
@@ -456,7 +467,8 @@ async function performTestRun(token, email = "unknown") {
         senderAllowlist: stored[STORAGE_KEYS.senderAllowlist], 
         senderBlocklist: stored[STORAGE_KEYS.senderBlocklist],
         userStopWords: stored[STORAGE_KEYS.userStopWords],
-        domainPrefs: stored[STORAGE_KEYS.domainPrefs]
+        domainPrefs: stored[STORAGE_KEYS.domainPrefs],
+        customRules: stored[STORAGE_KEYS.customRules]
       });
 
       if (!result) continue;

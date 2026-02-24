@@ -1,11 +1,11 @@
 # 🐸 Gmail OTP Extension (Frogus)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.3-green.svg)](https://github.com/froggychips/gmail-otp-extension)
+[![Version](https://img.shields.io/badge/version-1.1.5-green.svg)](https://github.com/froggychips/gmail-otp-extension)
 
 **Gmail OTP Extension** is an Open Source tool that saves you 20 seconds with every login. It automatically finds One-Time Passcodes (OTP) in your Gmail and allows you to paste them with a single click, without switching to your mail tab.
 
-[📥 Install from Chrome Web Store (Recommended)](https://chrome.google.com/webstore/detail/gmail-otp-extension/YOUR_EXTENSION_ID) | [💎 Get Pro Version](https://your-pro-version-link.com)
+[📥 Install from Chrome Web Store (Recommended)](#) | [💎 Get Pro Version](#how-to-get-pro)
 
 ---
 
@@ -30,12 +30,24 @@ We take security seriously:
 | 1-Click OTP Retrieval             | ✅   | ✅    |
 | Supports 1 Gmail Account          | ✅   | ✅    |
 | Context Menu (Paste OTP)          | ✅   | ✅    |
-| **Automatic Monitoring (Watch Mode)** | ❌   | ✅    |
-| **Multi-account Support**         | ❌   | ✅    |
-| **Priority Deep Scan (Code History)** | ❌   | ✅    |
-| **Custom Sender Rules**           | ❌   | ✅    |
+| **Auto-Magic Fill** (Auto insertion)| ❌   | ✅    |
+| **Telegram Forwarding**           | ❌   | ✅    |
+| **Accelerated Monitoring** (Fast)  | ❌   | ✅    |
+| **Unlimited History & Search**    | ❌   | ✅    |
+| **Custom Regex Rules**            | ❌   | ✅    |
+| **Unlimited Gmail Accounts**      | ❌   | ✅    |
 
-> **Why pay for Pro?** The paid version allows the extension to run in the background and notify you of a code the moment an email arrives. It's the Apple Ecosystem level of convenience for any website.
+---
+
+## 💎 How to get Pro?
+
+To support the project and unlock all features, you can purchase a license key:
+
+-   **International / Crypto:** [Buy via Sellix / Gumroad](#)
+-   **Russian Cards / RU Passport:** [Buy via Lava.top / Boosty](#)
+-   **Direct Telegram:** [Contact via @your_bot](#)
+
+*After purchase, you will receive a key like `PRO-XXXX-XXXX`. Enter it in the "Tools" tab of the extension.*
 
 ---
 
@@ -71,7 +83,7 @@ Developed with ❤️ for those who hate typing codes manually.
 
 **Gmail OTP Extension** — это Open Source инструмент, который экономит вам 20 секунд при каждом входе в систему. Он автоматически находит одноразовые коды (OTP) в вашем Gmail и позволяет вставить их в один клик, не переключаясь на вкладку почты.
 
-[📥 Установить из Chrome Web Store (Рекомендуется)](https://chrome.google.com/webstore/detail/gmail-otp-extension/YOUR_EXTENSION_ID) | [💎 Купить Pro Версию](https://your-pro-version-link.com)
+[📥 Установить из Chrome Web Store (Рекомендуется)](#) | [💎 Купить Pro Версию](#как-получить-pro)
 
 ---
 
@@ -89,19 +101,31 @@ Developed with ❤️ for those who hate typing codes manually.
 
 ---
 
-## 💎 Freemium: Free vs Pro
+## 💎 Freemium: Бесплатно vs Pro
 
 | Возможность                           | Free | Pro   |
 | :-------------------------------- | :--: | :---: |
 | Поиск OTP в 1 клик             | ✅   | ✅    |
 | Поддержка 1 аккаунта Gmail          | ✅   | ✅    |
 | Контекстное меню (Paste OTP)          | ✅   | ✅    |
-| **Автоматический мониторинг (Watch Mode)** | ❌   | ✅    |
-| **Поддержка нескольких аккаунтов (Multi-account)** | ❌   | ✅    |
-| **Приоритетный Deep Scan (История кодов)** | ❌   | ✅    |
-| **Кастомные правила для отправителей**   | ❌   | ✅    |
+| **Auto-Magic Fill** (Авто-вставка) | ❌   | ✅    |
+| **Пересылка в Telegram**           | ❌   | ✅    |
+| **Ускоренный мониторинг** (Fast)   | ❌   | ✅    |
+| **Безлимитная история и Поиск**    | ❌   | ✅    |
+| **Свои Regex-правила**             | ❌   | ✅    |
+| **Безлимитные аккаунты Gmail**     | ❌   | ✅    |
 
-> **Зачем платить за Pro?** Платная версия позволяет расширению работать в фоне и уведомлять вас о коде в ту же секунду, когда письмо упало в ящик. Это уровень комфорта Apple Ecosystem для любого сайта.
+---
+
+## 💎 Как получить Pro?
+
+Чтобы поддержать проект и разблокировать все функции, вы можете приобрести лицензионный ключ:
+
+-   **Карты РФ / СБП:** [Купить через Lava.top / Boosty](#)
+-   **Зарубежные карты / Крипта:** [Купить через Sellix](#)
+-   **Через Telegram:** [Связаться с @your_bot](#)
+
+*После оплаты вы получите ключ формата `PRO-XXXX-XXXX`. Введите его на вкладке «Инструменты» (Tools) внутри расширения.*
 
 ---
 

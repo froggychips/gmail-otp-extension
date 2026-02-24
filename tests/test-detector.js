@@ -82,6 +82,16 @@ const testCases = [
                     snippet: "Here is the Steam Guard code you need to access your account: P4XX7",
                     body: "It looks like you are trying to log in from a new device. ... Germany P4XX7 If this wasn't you...",
                     expectedCode: "P4XX7"
+                  },
+                  {
+                    name: "Email Verification Link",
+                    subject: "Verify your email address",
+                    from: "no-reply@service.com",
+                    snippet: "Please click the link below to verify your email.",
+                    body: "Welcome! To finish setting up your account, please verify your email: https://service.com/verify?token=abc123def456. This link expires in 24 hours.",
+                    expectedCode: null,
+                    expectedType: "link",
+                    expectedLink: "https://service.com/verify?token=abc123def456"
                   }
                 ];
                 
@@ -112,10 +122,15 @@ const testCases = [
       console.log(`- Code: ${code}, Base Score: ${score}`);
     });
     
-    console.log(`Result: ${best.code} (Score: ${best.score})`);
-    if (tc.expectedCode && best.code !== tc.expectedCode) {
-        console.log(`FAILED: Expected ${tc.expectedCode}`);
-    } else if (!tc.expectedCode && best.code && best.score > 0) {
+    console.log(`Result: ${best.code || best.link} (Score: ${best.score}, Type: ${best.type})`);
+    
+    if (tc.expectedType && best.type !== tc.expectedType) {
+        console.log(`FAILED: Expected type ${tc.expectedType}, got ${best.type}`);
+    } else if (tc.expectedLink && best.link !== tc.expectedLink) {
+        console.log(`FAILED: Expected link ${tc.expectedLink}, got ${best.link}`);
+    } else if (tc.expectedCode && best.code !== tc.expectedCode) {
+        console.log(`FAILED: Expected code ${tc.expectedCode}`);
+    } else if (!tc.expectedCode && !tc.expectedType && best.code && best.score > 0) {
         console.log(`FAILED: Should not have found a code with positive score`);
     }
     console.log('---');

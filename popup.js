@@ -21,6 +21,7 @@ const gmailThresholdEl = document.getElementById("gmailThreshold");
 const thresholdValEl = document.getElementById("thresholdVal");
 const exportDataBtn = document.getElementById("exportData");
 const importDataBtn = document.getElementById("importData");
+const exportHistoryCsvBtn = document.getElementById("exportHistoryCsv");
 const resetExtensionBtn = document.getElementById("resetExtension");
 const resetOptimalSettingsBtn = document.getElementById("resetOptimalSettings");
 const testRunBtn = document.getElementById("testRun");
@@ -61,6 +62,10 @@ const tgToggle = document.getElementById("gmailTgToggle");
 const tgSettingsEl = document.getElementById("tgSettings");
 const tgBotTokenInput = document.getElementById("tgBotTokenInput");
 const tgChatIdInput = document.getElementById("tgChatIdInput");
+const customRulesListEl = document.getElementById("customRulesList");
+const newRuleSenderEl = document.getElementById("newRuleSender");
+const newRuleRegexEl = document.getElementById("newRuleRegex");
+const addCustomRuleBtn = document.getElementById("addCustomRuleBtn");
 
 const TRANSLATIONS = {
   en: {
@@ -72,6 +77,8 @@ const TRANSLATIONS = {
     filters: "Filters",
     tools: "Tools",
     clickToCopy: "Click to copy",
+    clickToVerify: "Click to verify",
+    verifyLink: "Verify Link",
     mode: "Operating Mode",
     auto: "Auto",
     manual: "Manual",
@@ -143,6 +150,8 @@ const TRANSLATIONS = {
     filters: "Фильтры",
     tools: "Инструменты",
     clickToCopy: "Нажмите, чтобы скопировать",
+    clickToVerify: "Нажмите, чтобы подтвердить",
+    verifyLink: "Ссылка подтверждения",
     mode: "Режим работы",
     auto: "Авто",
     manual: "Ручной",
@@ -354,12 +363,107 @@ let isTestRunning = false;
 let isPro = false;
 let siteAllowlist = [];
 let clipboardClearSeconds = 20;
+let customRules = [];
 
 function renderProUI() {
   if (proBadgeEl) proBadgeEl.style.display = isPro ? "inline-block" : "none";
   if (proActiveStatusEl) proActiveStatusEl.style.display = isPro ? "block" : "none";
   if (proInactiveSectionEl) proInactiveSectionEl.style.display = isPro ? "none" : "block";
   if (proFeaturesSection) proFeaturesSection.style.display = isPro ? "block" : "none";
+  if (exportHistoryCsvBtn) exportHistoryCsvBtn.style.display = isPro ? "block" : "none";
+  if (isPro) renderCustomRules();
+}
+
+if (exportHistoryCsvBtn) {
+  exportHistoryCsvBtn.addEventListener("click", () => {
+    if (!gmailHistory.length) return;
+    
+    const headers = ["Date", "From", "Subject", "Code", "Account"];
+    const rows = gmailHistory.map(item => [
+      formatDate(item),
+      item.from,
+      item.subject || "",
+      item.code,
+      item.account || ""
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `otp-history-${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
+
+function renderCustomRules() {
+  if (!customRulesListEl) return;
+  customRulesListEl.innerHTML = "";
+  
+  if (!customRules.length) {
+    customRulesListEl.innerHTML = `<div class="hint" style="text-align:center; padding: 10px;">—</div>`;
+    return;
+  }
+
+  customRules.forEach((rule, index) => {
+    const el = document.createElement("div");
+    el.className = "list-item";
+    el.style.padding = "8px";
+    el.style.marginBottom = "6px";
+    el.style.fontSize = "11px";
+    el.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="min-width:0; flex:1;">
+          <div style="font-weight:700; color:var(--text-primary);">${escapeHtml(rule.sender)}</div>
+          <div style="font-family:monospace; color:var(--accent);">${escapeHtml(rule.regex)}</div>
+        </div>
+        <button class="remove-rule btn-edit" data-index="${index}">🗑️</button>
+      </div>
+    `;
+    customRulesListEl.appendChild(el);
+  });
+
+  document.querySelectorAll(".remove-rule").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const index = parseInt(e.target.dataset.index);
+      customRules.splice(index, 1);
+      await chrome.storage.local.set({ [STORAGE_KEYS.customRules]: customRules });
+      renderCustomRules();
+      showSecurityStatus(t("ruleDeleted"));
+    });
+  });
+}
+
+if (addCustomRuleBtn) {
+  addCustomRuleBtn.addEventListener("click", async () => {
+    const sender = newRuleSenderEl?.value?.trim();
+    const regex = newRuleRegexEl?.value?.trim();
+    
+    if (!sender || !regex) return;
+
+    // Test if regex is valid
+    try {
+      new RegExp(regex);
+    } catch (e) {
+      alert("Invalid Regex Pattern");
+      return;
+    }
+
+    customRules.push({ sender, regex });
+    await chrome.storage.local.set({ [STORAGE_KEYS.customRules]: customRules });
+    
+    if (newRuleSenderEl) newRuleSenderEl.value = "";
+    if (newRuleRegexEl) newRuleRegexEl.value = "";
+    
+    renderCustomRules();
+  });
 }
 
 if (autofillToggle) {
@@ -397,11 +501,19 @@ if (activateProBtn) {
     const originalText = activateProBtn.textContent;
     activateProBtn.textContent = t("processing");
 
-    // Mock validation: Keys starting with "PRO-" are valid
-    const isValid = key.startsWith("PRO-");
-    
-    setTimeout(async () => {
-      if (isValid) {
+    try {
+      // Твой URL на Cloudflare Workers
+      const WORKER_URL = "https://gmail-otp-auth.yourname.workers.dev/";
+
+      const response = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ license_key: key })
+      });
+
+      const result = await response.json();
+
+      if (result.activated) {
         isPro = true;
         await chrome.storage.local.set({ 
           [STORAGE_KEYS.isPro]: true,
@@ -411,11 +523,29 @@ if (activateProBtn) {
         renderAccountList();
         alert(t("activationSuccess"));
       } else {
+        // Fallback: если ключ PRO-TEST, активируем локально (для тестов)
+        if (key === "PRO-TEST") {
+           isPro = true;
+           await chrome.storage.local.set({ [STORAGE_KEYS.isPro]: true, [STORAGE_KEYS.licenseKey]: key });
+           renderProUI(); renderAccountList();
+           alert("Dev Activation Success!");
+           return;
+        }
         alert(t("activationError"));
       }
+    } catch (e) {
+      if (key === "PRO-TEST") {
+        isPro = true;
+        await chrome.storage.local.set({ [STORAGE_KEYS.isPro]: true });
+        renderProUI(); renderAccountList();
+        alert("Offline Dev Activation Success!");
+      } else {
+        alert("Verification server unreachable.");
+      }
+    } finally {
       activateProBtn.disabled = false;
       activateProBtn.textContent = originalText;
-    }, 1000);
+    }
   });
 }
 
@@ -561,10 +691,16 @@ function renderGmailPanel() {
   
   if (gmailEntry) {
     const domain = gmailEntry.domain || extractDomain(gmailEntry.from);
+    const isLink = gmailEntry.type === "link";
     
     if (gmailCodeEl) {
-      gmailCodeEl.textContent = gmailEntry.code;
-      gmailCodeEl.style.fontSize = gmailEntry.code.length > 8 ? '28px' : '48px';
+      if (isLink) {
+        gmailCodeEl.textContent = t("verifyLink");
+        gmailCodeEl.style.fontSize = "24px";
+      } else {
+        gmailCodeEl.textContent = gmailEntry.code;
+        gmailCodeEl.style.fontSize = gmailEntry.code.length > 8 ? '28px' : '48px';
+      }
     }
 
     if (heroIconEl) {
@@ -574,7 +710,7 @@ function renderGmailPanel() {
     if (heroNameEl) heroNameEl.textContent = cleanSenderName(gmailEntry.from);
     if (heroTimeEl) heroTimeEl.textContent = formatDate(gmailEntry, true);
     if (heroAccountEl) heroAccountEl.textContent = gmailEntry.account || "";
-    if (heroHintEl) heroHintEl.textContent = t("clickToCopy");
+    if (heroHintEl) heroHintEl.textContent = isLink ? t("clickToVerify") : t("clickToCopy");
   } else {
     if (gmailCodeEl) gmailCodeEl.textContent = "—";
     if (heroIconEl) heroIconEl.style.display = 'none';
@@ -617,13 +753,16 @@ function renderHistory() {
 
     const el = document.createElement("div");
     el.className = "list-item history-item";
+    const isLink = item.type === "link";
+    const displayVal = isLink ? "🔗" : escapeHtml(item.code);
+
     el.innerHTML = localizeHtml(`
       <img src="${favicon}" class="history-favicon" style="width: 16px; height: 16px; margin-right: 10px; border-radius: 2px;">
       <div class="history-info">
         <div class="history-title">${escapeHtml(item.subject || t("noSubject"))}</div>
         <div class="history-sub">${escapeHtml(item.from)} • ${escapeHtml(formatDate(item))}</div>
       </div>
-      <div class="history-val">${escapeHtml(item.code)}</div>
+      <div class="history-val">${displayVal}</div>
       <div class="history-actions"><button class="btn-edit" data-id="${escapeHtml(item.id)}">✏️</button></div>
     `);
     
@@ -631,24 +770,28 @@ function renderHistory() {
     correctionMenu.className = "correction-menu";
     correctionMenu.id = `correction-${item.id}`;
     
-    const others = item.others || [];
-    if (others.length > 0) {
-      correctionMenu.innerHTML = localizeHtml(`<div style="margin-bottom: 4px; color: var(--text-secondary);">__MSG_correctCodePrompt__</div>`);
-      others.forEach(other => {
-        const opt = document.createElement("span");
-        opt.className = "correction-option";
-        opt.textContent = other;
-        opt.addEventListener("click", async () => {
-          await sendMessageWithTimeout({ type: MSG.correctCode, id: item.id, code: other, domain: item.domain });
-          navigator.clipboard.writeText(other);
-          const stored = await chrome.storage.local.get(STORAGE_KEYS.history);
-          gmailHistory = stored[STORAGE_KEYS.history] || [];
-          renderHistory();
-        });
-        correctionMenu.appendChild(opt);
-      });
+    if (isLink) {
+      correctionMenu.innerHTML = `<div style="padding: 10px; word-break: break-all; font-size: 10px; color: var(--text-secondary);">${escapeHtml(item.link)}</div>`;
     } else {
-      correctionMenu.innerHTML = localizeHtml(`<div style="margin-bottom: 4px; color: var(--text-secondary);">__MSG_noOtherCodes__</div>`);
+      const others = item.others || [];
+      if (others.length > 0) {
+        correctionMenu.innerHTML = localizeHtml(`<div style="margin-bottom: 4px; color: var(--text-secondary);">__MSG_correctCodePrompt__</div>`);
+        others.forEach(other => {
+          const opt = document.createElement("span");
+          opt.className = "correction-option";
+          opt.textContent = other;
+          opt.addEventListener("click", async () => {
+            await sendMessageWithTimeout({ type: MSG.correctCode, id: item.id, code: other, domain: item.domain });
+            navigator.clipboard.writeText(other);
+            const stored = await chrome.storage.local.get(STORAGE_KEYS.history);
+            gmailHistory = stored[STORAGE_KEYS.history] || [];
+            renderHistory();
+          });
+          correctionMenu.appendChild(opt);
+        });
+      } else {
+        correctionMenu.innerHTML = localizeHtml(`<div style="margin-bottom: 4px; color: var(--text-secondary);">__MSG_noOtherCodes__</div>`);
+      }
     }
 
     const ignoreBtn = document.createElement("button");
@@ -663,8 +806,16 @@ function renderHistory() {
     });
     correctionMenu.appendChild(ignoreBtn);
 
-    el.querySelector(".history-info").addEventListener("click", () => navigator.clipboard.writeText(item.code));
-    el.querySelector(".history-val").addEventListener("click", () => navigator.clipboard.writeText(item.code));
+    const clickAction = () => {
+      if (isLink) {
+        chrome.tabs.create({ url: item.link });
+      } else {
+        navigator.clipboard.writeText(item.code);
+      }
+    };
+
+    el.querySelector(".history-info").addEventListener("click", clickAction);
+    el.querySelector(".history-val").addEventListener("click", clickAction);
     
     el.querySelector(".btn-edit").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -719,6 +870,7 @@ async function init() {
   isPro = !!storedData[STORAGE_KEYS.isPro];
 
   const stored = await new Promise(r => chrome.storage.local.get(null, r));
+  customRules = stored[STORAGE_KEYS.customRules] || [];
   
   if (autofillToggle) autofillToggle.checked = !!stored[STORAGE_KEYS.autofillEnabled];
   if (tgToggle) {
@@ -882,7 +1034,16 @@ if (modeManualBtn) modeManualBtn.addEventListener("click", () => {
 const hero = document.getElementById("gmailCodeWrapper");
 if (hero) {
   hero.addEventListener("click", async () => {
-    if (!gmailEntry?.code) return;
+    if (!gmailEntry) return;
+
+    if (gmailEntry.type === "link" && gmailEntry.link) {
+      chrome.tabs.create({ url: gmailEntry.link });
+      window.close();
+      return;
+    }
+
+    if (!gmailEntry.code) return;
+
     try {
       const code = gmailEntry.code;
       await navigator.clipboard.writeText(code);
