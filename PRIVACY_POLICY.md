@@ -1,59 +1,139 @@
 # Privacy Policy for Gmail OTP
 
-**Effective Date:** February 20, 2026
+**Effective Date:** February 24, 2026
 
 ## Introduction
-The **Gmail OTP** extension ("the Extension") is designed to help users quickly find and extract one-time passwords (OTP) and verification codes from their Gmail messages. We respect your privacy and are committed to protecting your personal data.
 
-## Data Collection and Usage
-The Extension requests the `https://www.googleapis.com/auth/gmail.readonly` permission to function. This access is used exclusively for the following purposes:
-1.  **Reading Email Metadata and Content:** The Extension reads the subject, snippet, and body of emails that match specific search criteria (e.g., "verification", "code", "OTP").
-2.  **Extracting OTP Codes:** The Extension extracts numerical or alphanumeric codes from these messages to display them to the user.
+**Gmail OTP** (the "Extension") helps users find one-time passwords (OTP) and verification codes in Gmail.
+We designed the Extension to process data locally and minimize data exposure.
 
-## Data Storage and Transmission
-*   **Local Processing:** All data retrieved from the Gmail API is processed locally within the user's browser.
-*   **No External Transmission:** No email content, metadata, or extracted codes are ever transmitted to any external servers, third-party services, or the developer of the Extension.
-*   **Storage:** Some metadata (such as the last checked message ID and a local history of extracted codes) is stored locally in the browser's `chrome.storage.local` to provide functionality and history. This data remains on your device.
+## Data We Access
+
+The Extension requests Gmail read access (`https://www.googleapis.com/auth/gmail.readonly`) and reads only data required for OTP detection:
+
+1. Email subject
+2. Email snippet
+3. Parsed email body text
+4. Sender/domain and message metadata needed for ranking and history
+
+## Why We Access This Data
+
+We use this data only to:
+
+1. Detect OTP/verification codes
+2. Display detected codes in the extension popup/history
+3. Support user actions such as correcting/ignoring detected codes
+4. Improve local detection behavior using local preferences
+
+## Local Processing and Storage
+
+- OTP detection and scoring are performed locally in the browser.
+- Operational settings and history are stored locally using `chrome.storage.local`.
+- Data stored locally may include account metadata, search settings, local logs, OTP history, allowlist/blocklist, and detection preferences.
+
+## Data Sharing, Selling, and Advertising
+
+- No email content, metadata, or extracted OTP codes are sent to our own servers.
+- We do not sell personal data.
+- We do not use personal data for advertising.
+- We do not transfer data to data brokers.
 
 ## Third-Party Services
-The Extension interacts directly with Google APIs to access your Gmail data. Your data is subject to [Google’s Privacy Policy](https://policies.google.com/privacy).
 
-## Your Rights
-You can revoke the Extension's access to your Google account at any time through your [Google Account Security settings](https://myaccount.google.com/permissions). You can also uninstall the Extension, which will remove all locally stored data.
+The Extension communicates directly with Google APIs for user-authorized Gmail access.
+Google’s handling is governed by [Google Privacy Policy](https://policies.google.com/privacy).
 
-## Changes to This Policy
-We may update this Privacy Policy from time to time. Any changes will be reflected in the updated "Effective Date."
+## Security Practices
+
+- HTTPS-only insertion targets for OTP paste flow.
+- Optional site allowlist for OTP insertion.
+- Optional clipboard auto-clear after copying OTP.
+- No OTP logging to page console.
+
+## Data Retention and User Control
+
+- Local data remains on the user’s device until the user clears extension data or uninstalls the extension.
+- Users can revoke Google access anytime via [Google Account permissions](https://myaccount.google.com/permissions).
+
+## Remote Code
+
+The Extension does not execute remotely hosted code.
+
+## Policy Updates
+
+We may update this policy over time. The effective date above will be updated when changes are made.
 
 ## Contact
-If you have any questions about this Privacy Policy, please contact the developer via the support link on the Chrome Web Store.
+
+For privacy questions, contact the developer via the support link in the Chrome Web Store listing.
 
 ---
 
-# Политика конфиденциальности для Gmail OTP
+# Политика конфиденциальности Gmail OTP
 
-**Дата вступления в силу:** 20 февраля 2026 г.
+**Дата вступления в силу:** 24 февраля 2026
 
 ## Введение
-Расширение **Gmail OTP** («Расширение») разработано для помощи пользователям в быстром поиске и извлечении одноразовых паролей (OTP) и кодов подтверждения из сообщений Gmail. Мы уважаем вашу конфиденциальность и стремимся защищать ваши персональные данные.
 
-## Сбор и использование данных
-Расширение запрашивает разрешение `https://www.googleapis.com/auth/gmail.readonly` для своей работы. Этот доступ используется исключительно в следующих целях:
-1.  **Чтение метаданных и содержания писем:** Расширение читает тему, фрагмент и текст писем, соответствующих определенным критериям поиска (например, «код», «подтверждение», «OTP»).
-2.  **Извлечение OTP-кодов:** Расширение извлекает числовые или буквенно-цифровые коды из этих сообщений для отображения пользователю.
+**Gmail OTP** («Расширение») помогает находить OTP и коды подтверждения в Gmail.
+Расширение спроектировано так, чтобы обрабатывать данные локально и минимизировать их передачу.
 
-## Хранение и передача данных
-*   **Локальная обработка:** Все данные, полученные через Gmail API, обрабатываются локально в браузере пользователя.
-*   **Отсутствие внешней передачи:** Ни содержание писем, ни метаданные, ни извлеченные коды никогда не передаются на внешние серверы, сторонние сервисы или разработчику Расширения.
-*   **Хранение:** Некоторые метаданные (например, ID последнего проверенного сообщения и локальная история извлеченных кодов) сохраняются локально в браузере через `chrome.storage.local` для обеспечения работы функций и истории. Эти данные остаются на вашем устройстве.
+## Какие данные доступны расширению
+
+Расширение запрашивает доступ Gmail read-only (`https://www.googleapis.com/auth/gmail.readonly`) и использует только данные, необходимые для распознавания OTP:
+
+1. Тема письма
+2. Фрагмент письма (snippet)
+3. Извлеченный текст тела письма
+4. Домен/отправитель и служебные метаданные для ранжирования и истории
+
+## Зачем нужен доступ
+
+Данные используются только для:
+
+1. Поиска OTP/кодов подтверждения
+2. Отображения найденных кодов в popup/истории
+3. Поддержки действий пользователя (исправить/игнорировать код)
+4. Локальной настройки качества распознавания
+
+## Локальная обработка и хранение
+
+- Распознавание и ранжирование OTP выполняется локально в браузере.
+- Настройки и история хранятся локально в `chrome.storage.local`.
+- Локально могут храниться: метаданные аккаунтов, параметры поиска, логи, история OTP, allowlist/blocklist и предпочтения распознавания.
+
+## Передача, продажа и реклама
+
+- Содержимое писем, метаданные и OTP-коды не отправляются на серверы разработчика.
+- Мы не продаём персональные данные.
+- Мы не используем данные для рекламы.
+- Мы не передаём данные брокерам данных.
 
 ## Сторонние сервисы
-Расширение взаимодействует напрямую с Google API для доступа к вашим данным Gmail. Ваши данные регулируются [Политикой конфиденциальности Google](https://policies.google.com/privacy).
 
-## Ваши права
-Вы можете отозвать доступ Расширения к вашему аккаунту Google в любое время через [настройки безопасности вашего аккаунта Google](https://myaccount.google.com/permissions). Вы также можете удалить Расширение, что приведет к удалению всех локально сохраненных данных.
+Расширение напрямую взаимодействует с Google API для доступа к Gmail по разрешению пользователя.
+Обработка на стороне Google регулируется [политикой конфиденциальности Google](https://policies.google.com/privacy).
 
-## Изменения в этой политике
-Мы можем периодически обновлять эту Политику конфиденциальности. Любые изменения будут отражены в обновленной «Дате вступления в силу».
+## Меры безопасности
+
+- Вставка OTP только на HTTPS-страницах.
+- Опциональный allowlist сайтов для вставки OTP.
+- Опциональная автоочистка буфера обмена.
+- OTP не логируются в консоль страницы.
+
+## Срок хранения и контроль пользователя
+
+- Локальные данные хранятся на устройстве пользователя до очистки данных расширения или удаления расширения.
+- Пользователь может отозвать доступ к Google-аккаунту через [настройки разрешений Google](https://myaccount.google.com/permissions).
+
+## Удалённый код
+
+Расширение не выполняет удалённо загружаемый код.
+
+## Обновления политики
+
+Политика может обновляться. При изменениях обновляется дата вступления в силу.
 
 ## Контакты
-Если у вас есть вопросы по этой Политике конфиденциальности, свяжитесь с разработчиком через ссылку поддержки в Chrome Web Store.
+
+По вопросам конфиденциальности используйте ссылку поддержки в карточке расширения в Chrome Web Store.
