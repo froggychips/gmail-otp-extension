@@ -48,3 +48,7 @@
 2. `tests/test-detector.js` для OTP-распознавания.
 3. `tests/test-security.js` для security-валидаторов.
 4. `tests/test-manifest.js` для smoke-проверки security-инвариантов манифеста.
+
+## Поддержка
+
+- Быстрые ответы на частые вопросы: `SUPPORT_FAQ.md`.
