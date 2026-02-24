@@ -5,7 +5,7 @@
 
 **Gmail OTP Extension** is an Open Source tool that saves you 20 seconds with every login. It automatically finds One-Time Passcodes (OTP) in your Gmail and allows you to paste them with a single click, without switching to your mail tab.
 
-[📥 Install from Chrome Web Store (Recommended)](#) | [💎 Get Pro Version](#how-to-get-pro)
+[📥 Install from Chrome Web Store (Recommended)](#) | [💎 Get Pro Version](https://app.lava.top/products/9587f860-b5ab-4212-94de-4f7332e9df4f)
 
 ---
 
@@ -44,7 +44,7 @@ We take security seriously:
 To support the project and unlock all features, you can purchase a license key:
 
 -   **International / Crypto:** [Buy via Sellix / Gumroad](#)
--   **Russian Cards / RU Passport:** [Buy via Lava.top / Boosty](#)
+-   **Russian Cards / RU Passport:** [Buy via Lava.top](https://app.lava.top/products/9587f860-b5ab-4212-94de-4f7332e9df4f)
 -   **Direct Telegram:** [Contact via @your_bot](#)
 
 *After purchase, you will receive a key like `PRO-XXXX-XXXX`. Enter it in the "Tools" tab of the extension.*
@@ -83,7 +83,7 @@ Developed with ❤️ for those who hate typing codes manually.
 
 **Gmail OTP Extension** — это Open Source инструмент, который экономит вам 20 секунд при каждом входе в систему. Он автоматически находит одноразовые коды (OTP) в вашем Gmail и позволяет вставить их в один клик, не переключаясь на вкладку почты.
 
-[📥 Установить из Chrome Web Store (Рекомендуется)](#) | [💎 Купить Pro Версию](#как-получить-pro)
+[📥 Установить из Chrome Web Store (Рекомендуется)](#) | [💎 Купить Pro Версию](https://app.lava.top/products/9587f860-b5ab-4212-94de-4f7332e9df4f)
 
 ---
 
@@ -121,7 +121,7 @@ Developed with ❤️ for those who hate typing codes manually.
 
 Чтобы поддержать проект и разблокировать все функции, вы можете приобрести лицензионный ключ:
 
--   **Карты РФ / СБП:** [Купить через Lava.top / Boosty](#)
+-   **Карты РФ / СБП:** [Купить через Lava.top](https://app.lava.top/products/9587f860-b5ab-4212-94de-4f7332e9df4f)
 -   **Зарубежные карты / Крипта:** [Купить через Sellix](#)
 -   **Через Telegram:** [Связаться с @your_bot](#)
 
