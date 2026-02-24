@@ -15,7 +15,7 @@
           <div class="title">Gmail OTP</div>
         </div>
         <div class="header-right">
-          <button id="accountToggle" class="account-toggle">
+          <button id="accountToggle" class="account-toggle" aria-label="Toggle accounts">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </button>
         </div>
@@ -53,7 +53,7 @@
         <div class="otp-hero" id="gmailCodeWrapper" style="cursor:pointer">
           <div class="hero-header">
             <div id="heroService" class="hero-service">
-              <img id="heroIcon" src="" class="hero-icon">
+              <img id="heroIcon" src="" class="hero-icon" alt="Service icon">
               <span id="heroName">...</span>
             </div>
             <div id="heroTime" class="hero-time">--:--</div>
@@ -73,11 +73,11 @@
 
         <div class="card">
           <div class="card-title" data-t="mode">Режим работы</div>
-          <div class="toggle-group" style="display: flex; background: var(--bg-secondary); padding: 4px; border-radius: 8px; border: 1px solid var(--border);">
-            <button id="modeAuto" class="tab-btn active" style="flex:1; padding: 6px;" data-t="auto">Авто</button>
-            <button id="modeManual" class="tab-btn" style="flex:1; padding: 6px;" data-t="manual">Ручной</button>
+          <div class="toggle-group mode-group">
+            <button id="modeAuto" class="tab-btn mode-btn active" data-t="auto">Авто</button>
+            <button id="modeManual" class="tab-btn mode-btn" data-t="manual">Ручной</button>
           </div>
-          <div class="hint" id="modeHint" style="font-size: 11px; margin-top: 8px; color: var(--text-secondary);" data-t="autoDesc">Авто: проверка раз в минуту.</div>
+          <div class="hint mode-hint" id="modeHint" data-t="autoDesc">Авто: проверка раз в минуту.</div>
         </div>
         
         <div class="field-group">
@@ -92,7 +92,7 @@
       <div class="tabs-content" id="tab-history">
         <div class="card">
           <div class="card-title" data-t="historyTitle">Последние кодов</div>
-          <div id="historyList" class="history-list" style="margin-bottom: 12px;">
+          <div id="historyList" class="history-list history-list-spaced">
             <div class="list-item" data-t="empty">Список пуст</div>
           </div>
           <button id="clearHistory" class="btn btn-ghost" style="width: 100%;" data-t="clearHistory">Очистить историю</button>
@@ -136,14 +136,16 @@
           <button id="resetOptimalSettings" class="btn btn-ghost" style="width: 100%; border-color: var(--accent); color: var(--accent);">Оптимальные настройки</button>
 
           <div class="card">
-            <div class="card-title">Security</div>
-            <label class="field-label" for="siteAllowlistInput" style="margin-bottom: 6px;">Allowed sites for OTP paste (one domain per line)</label>
+            <div class="card-title" data-t="securityTitle">Security</div>
+            <label class="field-label" for="siteAllowlistInput" style="margin-bottom: 6px;" data-t="allowlistLabel">Allowed sites for OTP paste (one domain per line)</label>
             <textarea id="siteAllowlistInput" rows="4" style="width: 100%; resize: vertical;" placeholder="example.com&#10;accounts.example.com"></textarea>
-            <label class="field-label" for="clipboardClearSecondsInput" style="margin-top: 10px; margin-bottom: 6px;">Clipboard auto-clear (seconds)</label>
+            <div id="allowlistSummary" class="hint" style="font-size: 11px; margin-top: 6px;">All HTTPS domains allowed</div>
+            <label class="field-label" for="clipboardClearSecondsInput" style="margin-top: 10px; margin-bottom: 6px;" data-t="clipboardLabel">Clipboard auto-clear (seconds)</label>
             <input id="clipboardClearSecondsInput" type="number" min="0" max="300" step="1" />
-            <div class="hint" style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+            <div class="hint" style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;" data-t="clipboardHint">
               0 disables auto-clear.
             </div>
+            <div id="securityStatus" class="hint" style="font-size: 11px; margin-top: 8px;"></div>
           </div>
         </div>
       </div>

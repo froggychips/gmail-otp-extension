@@ -26,3 +26,6 @@ jobs:
 
       - name: OTP detector tests
         run: node tests/test-detector.js
+
+      - name: Security validator tests
+        run: node tests/test-security.js

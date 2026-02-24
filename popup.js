@@ -45,6 +45,9 @@ const accountListEl = document.getElementById("accountList");
 const accountScrollerEl = document.getElementById("accountScroller");
 const siteAllowlistInputEl = document.getElementById("siteAllowlistInput");
 const clipboardClearSecondsInputEl = document.getElementById("clipboardClearSecondsInput");
+const securityStatusEl = document.getElementById("securityStatus");
+const allowlistSummaryEl = document.getElementById("allowlistSummary");
+const appRootEl = document.querySelector(".app");
 
 const I18N = {
   ru: {
@@ -74,7 +77,15 @@ const I18N = {
     testRun: "Глубокий тест (500 писем)", testRunOk: "Тест завершен! Найдено кодов: ",
     exportFull: "Экспорт всех кодов + HTML", exportFullOk: "Экспорт завершен! Файл готов.",
     clearHistory: "Очистить историю", clearHistoryConfirm: "Вы уверены, что хотите очистить всю историю кодов?",
-    clickToCopy: "Нажмите, чтобы скопировать"
+    clickToCopy: "Нажмите, чтобы скопировать",
+    securityTitle: "Безопасность",
+    allowlistLabel: "Разрешенные сайты для вставки OTP (домен на строку)",
+    clipboardLabel: "Автоочистка буфера (сек)",
+    clipboardHint: "0 — отключить автоочистку.",
+    securitySaved: "Настройки безопасности сохранены",
+    allowlistInvalid: "Некорректные домены пропущены: ",
+    allowlistAll: "Разрешены все HTTPS-домены",
+    allowlistCount: "домен(ов) в списке"
   },
   en: {
     code: "Code", history: "History", filters: "Filters", tools: "Tools",
@@ -103,7 +114,15 @@ const I18N = {
     testRun: "Deep Test (500 emails)", testRunOk: "Test complete! Codes found: ",
     exportFull: "Export All Codes + HTML", exportFullOk: "Export complete! File ready.",
     clearHistory: "Clear History", clearHistoryConfirm: "Are you sure you want to clear all code history?",
-    clickToCopy: "Click to copy"
+    clickToCopy: "Click to copy",
+    securityTitle: "Security",
+    allowlistLabel: "Allowed sites for OTP paste (one domain per line)",
+    clipboardLabel: "Clipboard auto-clear (seconds)",
+    clipboardHint: "Set 0 to disable auto-clear.",
+    securitySaved: "Security settings saved",
+    allowlistInvalid: "Skipped invalid domains: ",
+    allowlistAll: "All HTTPS domains allowed",
+    allowlistCount: "domain(s) configured"
   }
 };
 
@@ -125,7 +144,7 @@ function translateUI() {
   document.querySelectorAll("[data-t]").forEach(el => {
     const key = el.getAttribute("data-t");
     if (T[key]) {
-      if (el.tagName === "INPUT" && el.placeholder !== undefined) el.placeholder = T[key];
+      if ((el.tagName === "INPUT" || el.tagName === "TEXTAREA") && el.placeholder !== undefined) el.placeholder = T[key];
       else el.innerHTML = T[key];
     }
   });
@@ -211,35 +230,34 @@ function hostnameFromUrl(url) {
   }
 }
 
-function isAllowedSiteHost(hostname, allowlist = []) {
-  const normalizedHost = String(hostname || "").toLowerCase();
-  if (!normalizedHost) return false;
-  if (!Array.isArray(allowlist) || allowlist.length === 0) return true;
-  return allowlist.some((entry) => {
-    const domain = String(entry || "").trim().toLowerCase();
-    if (!domain) return false;
-    return normalizedHost === domain || normalizedHost.endsWith(`.${domain}`);
-  });
+function normalizePopupScale() {
+  if (!appRootEl) return;
+  const viewportScale = window.visualViewport?.scale || 1;
+  if (viewportScale > 1.01) {
+    const inverse = 1 / viewportScale;
+    appRootEl.style.transform = `scale(${inverse})`;
+    appRootEl.style.transformOrigin = "top left";
+    appRootEl.style.width = `${viewportScale * 100}%`;
+    appRootEl.style.height = `${viewportScale * 100}%`;
+  } else {
+    appRootEl.style.transform = "";
+    appRootEl.style.transformOrigin = "";
+    appRootEl.style.width = "";
+    appRootEl.style.height = "";
+  }
 }
 
-function parseDomainList(value) {
-  return String(value || "")
-    .split(/\n|,/)
-    .map(s => s.trim().toLowerCase())
-    .filter(Boolean)
-    .filter(s => /^[a-z0-9.-]+$/.test(s) && s.includes("."));
+function showSecurityStatus(message, isError = false) {
+  if (!securityStatusEl) return;
+  securityStatusEl.textContent = message;
+  securityStatusEl.style.color = isError ? "var(--danger)" : "var(--success)";
 }
 
-function clampClipboardSeconds(value) {
-  const parsed = parseInt(value, 10);
-  if (Number.isNaN(parsed)) return 20;
-  return Math.min(300, Math.max(0, parsed));
-}
-
-function sanitizeCsvValue(value) {
-  const str = String(value ?? "");
-  if (/^[=+\-@]/.test(str)) return `'${str}`;
-  return str;
+function updateAllowlistSummary() {
+  if (!allowlistSummaryEl) return;
+  allowlistSummaryEl.textContent = siteAllowlist.length
+    ? `${siteAllowlist.length} ${T.allowlistCount}`
+    : T.allowlistAll;
 }
 
 async function sendMessageWithTimeout(message, timeout = 60000) {
@@ -531,7 +549,7 @@ async function init() {
   gmailMode = stored[STORAGE_KEYS.mode] || "auto";
   isTestRunning = !!stored[STORAGE_KEYS.isTestRunning];
   siteAllowlist = stored[STORAGE_KEYS.siteAllowlist] || [];
-  clipboardClearSeconds = Math.max(0, parseInt(stored[STORAGE_KEYS.clipboardClearSeconds], 10) || 20);
+  clipboardClearSeconds = VALIDATORS.clampClipboardSeconds(stored[STORAGE_KEYS.clipboardClearSeconds]);
   const isAdvancedFilters = !!stored[STORAGE_KEYS.advancedTestMode];
   const isTestingTools = !!stored[STORAGE_KEYS.testingToolsMode];
   
@@ -558,22 +576,31 @@ async function init() {
   if (siteAllowlistInputEl) {
     siteAllowlistInputEl.value = siteAllowlist.join("\n");
     siteAllowlistInputEl.addEventListener("change", async () => {
-      siteAllowlist = parseDomainList(siteAllowlistInputEl.value);
+      const parsed = VALIDATORS.parseDomainList(siteAllowlistInputEl.value);
+      siteAllowlist = parsed.valid;
       siteAllowlistInputEl.value = siteAllowlist.join("\n");
       await chrome.storage.local.set({ [STORAGE_KEYS.siteAllowlist]: siteAllowlist });
+      updateAllowlistSummary();
+      if (parsed.invalid.length) {
+        showSecurityStatus(T.allowlistInvalid + parsed.invalid.join(", "), true);
+      } else {
+        showSecurityStatus(T.securitySaved);
+      }
     });
   }
 
   if (clipboardClearSecondsInputEl) {
     clipboardClearSecondsInputEl.value = String(clipboardClearSeconds);
     clipboardClearSecondsInputEl.addEventListener("change", async () => {
-      clipboardClearSeconds = clampClipboardSeconds(clipboardClearSecondsInputEl.value);
+      clipboardClearSeconds = VALIDATORS.clampClipboardSeconds(clipboardClearSecondsInputEl.value);
       clipboardClearSecondsInputEl.value = String(clipboardClearSeconds);
       await chrome.storage.local.set({ [STORAGE_KEYS.clipboardClearSeconds]: clipboardClearSeconds });
+      showSecurityStatus(T.securitySaved);
     });
   }
   
   translateUI();
+  updateAllowlistSummary();
   renderAccountList();
   renderGmailPanel();
   if (gmailAccounts.length > 0) fetchLatestGmailCode();
@@ -669,7 +696,7 @@ if (hero) {
       const tabs = await new Promise((resolve) => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
       const activeTab = tabs[0];
       const activeHost = hostnameFromUrl(activeTab?.url || "");
-      const canPasteToTab = !!(activeTab?.id && activeTab?.url?.startsWith("https://") && isAllowedSiteHost(activeHost, siteAllowlist));
+      const canPasteToTab = !!(activeTab?.id && activeTab?.url?.startsWith("https://") && VALIDATORS.isAllowedSiteHost(activeHost, siteAllowlist));
       if (canPasteToTab) {
         chrome.tabs.sendMessage(activeTab.id, { action: "PASTE_OTP", code }).catch(() => {});
       }
@@ -760,7 +787,7 @@ if (exportFullBtn) {
             row.html
           ].map(val => {
             // Escape double quotes by doubling them
-            const str = sanitizeCsvValue(val).replace(/"/g, '""');
+            const str = VALIDATORS.sanitizeCsvCell(val).replace(/"/g, '""');
             // Wrap in double quotes
             return `"${str}"`;
           });
@@ -845,3 +872,9 @@ init().catch(e => {
   const statusBadge = document.getElementById("status");
   if (statusBadge) { statusBadge.textContent = T.loadError; statusBadge.style.color = "var(--danger)"; }
 });
+
+normalizePopupScale();
+window.addEventListener("resize", normalizePopupScale);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", normalizePopupScale);
+}
