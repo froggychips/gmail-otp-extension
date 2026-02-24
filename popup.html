@@ -10,37 +10,23 @@
     <main class="app">
       <!-- Header -->
       <header class="header">
-        <div class="logo-group">
-          <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail-search"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="M18 12v1"/><path d="M18 16v1"/><path d="M18 20v1"/></svg>
+        <div class="header-left">
+          <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="M18 12v1"/><path d="M18 16v1"/><path d="M18 20v1"/></svg>
           <div class="title">Gmail OTP</div>
         </div>
-        <div class="header-right" style="display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; overflow: hidden;">
-          <div id="accountScroller" class="account-scroller" style="font-size: 10px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; text-align: right; transition: opacity 0.3s;"></div>
+        <div class="header-right">
           <button id="accountToggle" class="account-toggle">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span id="accountIndicator" class="indicator"></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </button>
         </div>
-      </header>
-
-      <!-- Account Dropdown (Hidden by default) -->
-      <div id="accountDropdown" class="account-dropdown">
-        <div class="card" style="margin-bottom:0; border:none; box-shadow:none;">
+        
+        <!-- Dropdown now absolutely positioned -->
+        <div id="accountDropdown" class="account-dropdown">
           <div class="card-title" data-t="account">Аккаунты</div>
-          
-          <div id="accountList" style="margin-bottom: 12px;">
-            <!-- Dynamic list of accounts -->
-          </div>
-
-          <div class="field-group" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px; margin-bottom:0;">
-            <button id="gmailConnect" class="btn btn-primary" data-t="connect">Добавить аккаунт</button>
-          </div>
-          
-          <div class="hint" data-t="profileNote" style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; font-size: 10px;">
-            Используется аккаунт профиля Chrome
-          </div>
+          <div id="accountList"></div>
+          <button id="gmailConnect" class="btn btn-primary" style="margin-top: 12px; width: 100%;" data-t="connect">Добавить аккаунт</button>
         </div>
-      </div>
+      </header>
 
       <!-- Navigation -->
       <nav class="tabs-nav">
@@ -65,9 +51,24 @@
       <!-- Content: Code -->
       <div class="tabs-content active" id="tab-code">
         <div class="otp-hero" id="gmailCodeWrapper" style="cursor:pointer">
-          <div class="otp-meta" data-t="lastFound">Последний найденный код</div>
-          <div id="gmailCode" class="otp-code">—</div>
-          <div id="gmailMeta" class="otp-meta">—</div>
+          <div class="hero-header">
+            <div id="heroService" class="hero-service">
+              <img id="heroIcon" src="" class="hero-icon">
+              <span id="heroName">...</span>
+            </div>
+            <div id="heroTime" class="hero-time">--:--</div>
+          </div>
+          
+          <div class="hero-body">
+            <div id="gmailCode" class="otp-code">—</div>
+            <div class="copy-hint" id="heroHint" data-t="clickToCopy">Нажмите, чтобы скопировать</div>
+          </div>
+
+          <div class="hero-footer">
+            <div id="heroAccount" class="hero-account">—</div>
+          </div>
+          
+          <div id="copyIndicator" class="copy-indicator">✓</div>
         </div>
 
         <div class="card">
@@ -90,7 +91,7 @@
       <!-- Content: History -->
       <div class="tabs-content" id="tab-history">
         <div class="card">
-          <div class="card-title" data-t="historyTitle">Последние 10 кодов</div>
+          <div class="card-title" data-t="historyTitle">Последние кодов</div>
           <div id="historyList" class="history-list" style="margin-bottom: 12px;">
             <div class="list-item" data-t="empty">Список пуст</div>
           </div>
@@ -102,36 +103,47 @@
       <div class="tabs-content" id="tab-filters">
         <div class="card">
           <div class="card-title" data-t="searchSettings">Настройки поиска</div>
-          
-          <div class="switch-row">
-            <label class="field-label" for="gmailUnreadOnly" style="margin-bottom:0" data-t="unreadOnly">Искать только в непрочитанных</label>
+          <div class="switch-row" style="display: flex; justify-content: space-between; align-items: center;">
+            <label class="field-label" for="gmailUnreadOnly" style="margin:0; font-weight: 600;" data-t="unreadOnly">Искать только в непрочитанных</label>
             <input id="gmailUnreadOnly" type="checkbox" />
           </div>
-          <div class="hint" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;" data-t="unreadDesc">
+          <div class="hint" style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;" data-t="unreadDesc">
             Рекомендуется: так расширение работает быстрее и точнее.
-          </div>
-
-          <div style="margin-top: 16px;">
-            <button id="toggleAdvanced" class="btn btn-ghost" style="font-size: 11px; padding: 4px; border: none; background: transparent; color: var(--accent); justify-content: flex-start;">
-              <span data-t="advanced">▶ Продвинутые настройки</span>
-            </button>
-            <div id="advancedSection" style="display: none; margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;">
-              <div class="field-group">
-                <label class="field-label" for="gmailQuery" data-t="rawQuery">Запрос Gmail (Query)</label>
-                <input id="gmailQuery" type="text" style="font-family: monospace; font-size: 11px;" />
-              </div>
-            </div>
           </div>
         </div>
 
         <div class="card">
-          <div class="card-title"><span data-t="recognition">Алгоритм распознавания</span></div>
-          <div class="switch-row" style="margin-bottom: 8px;">
-            <label class="field-label" style="margin:0"><span data-t="sensitivity">Чувствительность</span>: <span id="thresholdVal" style="color: var(--accent); font-weight: 700;">3</span></label>
+          <div class="switch-row" style="display: flex; justify-content: space-between; align-items: center;">
+            <label class="field-label" style="margin:0; font-weight: 700; color: var(--text-primary);">Продвинутые настройки</label>
+            <input id="advancedFiltersToggle" type="checkbox" />
           </div>
-          <input id="gmailThreshold" type="range" min="1" max="8" value="3" step="1" />
-          <div class="hint" style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;" data-t="sensDesc">
-            Низкая — ловит всё подряд.<br>Высокая — только 100% коды.
+        </div>
+
+        <div id="advancedFiltersSection" style="display: none;">
+          <div class="card">
+            <div class="card-title"><span data-t="recognition">Алгоритм распознавания</span></div>
+            <div class="switch-row" style="margin-bottom: 8px;">
+              <label class="field-label" style="margin:0"><span data-t="sensitivity">Чувствительность</span>: <span id="thresholdVal" style="color: var(--accent); font-weight: 700;">3</span></label>
+            </div>
+            <input id="gmailThreshold" type="range" min="1" max="25" value="3" step="1" />
+          </div>
+
+          <div class="card">
+            <div class="card-title" data-t="rawQuery">Запрос Gmail (Query)</div>
+            <input id="gmailQuery" type="text" />
+          </div>
+
+          <button id="resetOptimalSettings" class="btn btn-ghost" style="width: 100%; border-color: var(--accent); color: var(--accent);">Оптимальные настройки</button>
+
+          <div class="card">
+            <div class="card-title">Security</div>
+            <label class="field-label" for="siteAllowlistInput" style="margin-bottom: 6px;">Allowed sites for OTP paste (one domain per line)</label>
+            <textarea id="siteAllowlistInput" rows="4" style="width: 100%; resize: vertical;" placeholder="example.com&#10;accounts.example.com"></textarea>
+            <label class="field-label" for="clipboardClearSecondsInput" style="margin-top: 10px; margin-bottom: 6px;">Clipboard auto-clear (seconds)</label>
+            <input id="clipboardClearSecondsInput" type="number" min="0" max="300" step="1" />
+            <div class="hint" style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+              0 disables auto-clear.
+            </div>
           </div>
         </div>
       </div>
@@ -139,35 +151,48 @@
       <!-- Content: Tools -->
       <div class="tabs-content" id="tab-tools">
         <div class="card">
-          <div class="card-title" data-t="logs">Логи системы</div>
-          <div class="logs-container" id="logsList">—</div>
-          <div class="field-group" style="display: flex; gap: 8px; margin-top: 8px;">
-            <button id="refreshLogs" class="btn btn-ghost" style="flex:1" data-t="refresh">Обновить</button>
-            <button id="clearLogs" class="btn btn-ghost" style="flex:1" data-t="clear">Очистить</button>
+          <div class="switch-row" style="display: flex; justify-content: space-between; align-items: center;">
+            <label class="field-label" style="margin:0; font-weight: 700; color: var(--accent);">Инструменты тестирования</label>
+            <input id="testingToolsToggle" type="checkbox" />
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-title" data-t="unmatched">Неопознанные письма</div>
-          <div id="unmatchedList" style="max-height: 150px; overflow-y: auto;">—</div>
-          <div class="field-group" style="display: flex; gap: 8px; margin-top: 8px;">
-            <button id="undoAction" class="btn btn-ghost" disabled data-t="undo">Отменить</button>
-            <button id="unmatchedClear" class="btn btn-ghost" data-t="clear">Очистить</button>
+        <div id="advancedTestSection" style="display: none;">
+          <div class="card">
+            <div class="card-title">Тестирование</div>
+            <button id="testRun" class="btn btn-ghost" style="width: 100%; margin-bottom: 8px;" data-t="testRun">Глубокий тест (500 писем)</button>
+            <button id="exportFull" class="btn btn-ghost" style="width: 100%; color: #10b981; border-color: #10b981;" data-t="exportFull">Экспорт всех кодов</button>
+          </div>
+
+          <div class="card">
+            <div class="card-title" data-t="logs">Логи системы</div>
+            <div class="logs-container" id="logsList">—</div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button id="refreshLogs" class="btn btn-ghost" style="flex:1; padding: 8px; font-size: 12px;" data-t="refresh">Обновить</button>
+              <button id="clearLogs" class="btn btn-ghost" style="flex:1; padding: 8px; font-size: 12px;" data-t="clear">Очистить</button>
+            </div>
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-title" data-t="data">Данные</div>
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <div style="display: flex; gap: 8px;">
-              <button id="exportData" class="btn btn-ghost" style="flex:1" data-t="export">Экспорт</button>
-              <button id="importData" class="btn btn-ghost" style="flex:1" data-t="import">Импорт</button>
+          <div class="card">
+            <div class="card-title" data-t="unmatched">Неопознанные письма</div>
+            <div id="unmatchedList" style="max-height: 150px; overflow-y: auto;">—</div>
+            <div class="field-group" style="display: flex; gap: 8px; margin-top: 8px;">
+              <button id="unmatchedClear" class="btn btn-ghost" style="flex:1" data-t="clear">Очистить</button>
             </div>
-            <button id="testRun" class="btn btn-ghost" style="width: 100%; border-color: var(--accent); color: var(--accent);" data-t="testRun">Глубокий тест (500 писем)</button>
-            <div class="hint" style="font-size: 10px; padding: 8px; background: var(--bg-secondary); border-radius: 6px; margin-top: 4px;">
-              <strong>Инструкция:</strong> Запустите тест, затем проверьте вкладку <em>История</em>. Используйте блок <em>Неопознанные письма</em> ниже, чтобы обучить фильтр.
+          </div>
+        </div>
+
+        <div id="basicToolsSection">
+          <div class="card">
+            <div class="card-title" data-t="data">Данные</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; gap: 8px;">
+                <button id="exportData" class="btn btn-ghost" style="flex:1" data-t="export">Экспорт</button>
+                <button id="importData" class="btn btn-ghost" style="flex:1" data-t="import">Импорт</button>
+              </div>
+              <button id="resetExtension" class="btn btn-danger" style="width: 100%;" data-t="reset">Сбросить всё</button>
             </div>
-            <button id="resetExtension" class="btn btn-danger" style="width: 100%;" data-t="reset">Сбросить всё</button>
           </div>
         </div>
       </div>

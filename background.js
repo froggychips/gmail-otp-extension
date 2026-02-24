@@ -121,6 +121,25 @@ function extractEmailDomain(from) {
   return addr ? addr.split("@")[1] || "" : "";
 }
 
+function hostnameFromUrl(url) {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function isAllowedSiteHost(hostname, allowlist = []) {
+  const normalizedHost = String(hostname || "").toLowerCase();
+  if (!normalizedHost) return false;
+  if (!Array.isArray(allowlist) || allowlist.length === 0) return true;
+  return allowlist.some((entry) => {
+    const domain = String(entry || "").trim().toLowerCase();
+    if (!domain) return false;
+    return normalizedHost === domain || normalizedHost.endsWith(`.${domain}`);
+  });
+}
+
 function base64UrlDecode(input) {
   if (!input) return "";
   const fixed = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -279,12 +298,8 @@ async function runGmailWatch() {
             title: `Gmail OTP (${account.email})`, message: `Код: ${codeData.code}`, priority: 2
           });
 
-          // AUTO-INSERT: Try to paste into the active tab
-          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs[0]?.id) {
-              chrome.tabs.sendMessage(tabs[0].id, { action: "PASTE_OTP", code: codeData.code }).catch(() => {});
-            }
-          });
+          // Security-first behavior: do not auto-paste from background polling.
+          // User-triggered paste is still available from popup/context menu.
         }
       } catch (err) {
         if (err.message !== "Auth failed" && err.message !== "rate_limit_backoff") {
@@ -714,6 +729,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "pasteOtp" && currentOtpCode && tab?.id) {
-    chrome.tabs.sendMessage(tab.id, { action: "PASTE_OTP", code: currentOtpCode });
+    if (!tab.url || !tab.url.startsWith("https://")) {
+      log("Blocked OTP paste from context menu on non-HTTPS tab:", tab.url || "unknown");
+      return;
+    }
+    const host = hostnameFromUrl(tab.url);
+    storageGet(STORAGE_KEYS.siteAllowlist).then((data) => {
+      const siteAllowlist = data[STORAGE_KEYS.siteAllowlist] || [];
+      if (!isAllowedSiteHost(host, siteAllowlist)) {
+        log("Blocked OTP paste for host not in site allowlist:", host);
+        return;
+      }
+      chrome.tabs.sendMessage(tab.id, { action: "PASTE_OTP", code: currentOtpCode });
+    });
   }
 });

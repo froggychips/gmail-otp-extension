@@ -1,62 +1,132 @@
-// content.js — Автозаполнение OTP (поддержка input, textarea и contenteditable)
-// Исправлено: защита от XSS (отказ от innerHTML) и улучшенная эмуляция ввода
+// content.js — Ультимативная вставка (v5)
+
+let lastPendingCode = null;
+
+function isSecurePage() {
+  return window.location.protocol === "https:";
+}
+
+function isAllowedSiteHost(hostname, allowlist = []) {
+  const normalizedHost = String(hostname || "").toLowerCase();
+  if (!normalizedHost) return false;
+  if (!Array.isArray(allowlist) || allowlist.length === 0) return true;
+  return allowlist.some((entry) => {
+    const domain = String(entry || "").trim().toLowerCase();
+    if (!domain) return false;
+    return normalizedHost === domain || normalizedHost.endsWith(`.${domain}`);
+  });
+}
+
+function isVisibleEditable(el) {
+  if (!el) return false;
+  if (el.isContentEditable) return true;
+  if (el.disabled || el.readOnly) return false;
+  const style = window.getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function looksLikeOtpField(el) {
+  if (!el) return false;
+  const attrs = [
+    el.name,
+    el.id,
+    el.placeholder,
+    el.getAttribute?.("autocomplete"),
+    el.getAttribute?.("aria-label"),
+    el.getAttribute?.("inputmode")
+  ].join(" ").toLowerCase();
+
+  if (/one-time-code/.test(attrs)) return true;
+  return /otp|code|verification|verify|confirm|passcode|pin|2fa|two[-\s]?factor|auth/.test(attrs);
+}
+
+async function doInsert(el, value) {
+  if (!el) return false;
+
+  try {
+    el.focus();
+    
+    // Пытаемся очистить поле
+    try { el.value = ''; } catch(e) {}
+
+    // Метод 1: document.execCommand (имитация вставки)
+    document.execCommand('selectAll', false, null);
+    const commandSuccess = document.execCommand('insertText', false, value);
+    
+    // Проверка результата
+    if (!commandSuccess || (el.value !== value && !el.isContentEditable)) {
+      // Метод 2: Прямая установка через нативный сеттер
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set || 
+                           Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+      
+      if (nativeSetter) {
+        nativeSetter.call(el, value);
+      } else {
+        el.value = value;
+      }
+
+      // Генерируем события
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      // Метод 3: Посимвольная эмуляция (для самых капризных полей)
+      if (el.value !== value) {
+        for (let char of value) {
+          el.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+          el.dispatchEvent(new KeyboardEvent('keypress', { key: char, bubbles: true }));
+          el.dispatchEvent(new KeyboardEvent('keyup', { key: char, bubbles: true }));
+        }
+      }
+    }
+
+    // Визуальная индикация
+    el.style.outline = '2px solid #22c55e';
+    setTimeout(() => el.style.outline = '', 1000);
+
+    return true;
+  } catch (e) {
+    console.error("[Gmail OTP] Insert error:", e);
+    return false;
+  }
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "PASTE_OTP" && message.code) {
-    const activeEl = document.activeElement;
-
-    if (!activeEl) {
-      sendResponse({ success: false, reason: "no_active_element" });
-      return;
+    if (!isSecurePage()) {
+      sendResponse({ success: false, reason: "insecure_page" });
+      return true;
     }
-
-    let inserted = false;
-    const codeStr = String(message.code);
-
-    // 1. Обычные поля ввода (INPUT, TEXTAREA)
-    if (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA") {
-      const start = activeEl.selectionStart || 0;
-      const end = activeEl.selectionEnd || 0;
-
-      activeEl.value = activeEl.value.substring(0, start) + 
-                      codeStr + 
-                      activeEl.value.substring(end);
-
-      const newPos = start + codeStr.length;
-      activeEl.selectionStart = activeEl.selectionEnd = newPos;
-
-      activeEl.dispatchEvent(new Event("input", { bubbles: true }));
-      activeEl.dispatchEvent(new Event("change", { bubbles: true }));
-      inserted = true;
-    }
-    // 2. contenteditable (div, p, span и т.д.)
-    else if (activeEl.isContentEditable) {
-      const sel = window.getSelection();
-      if (sel.rangeCount) {
-        const range = sel.getRangeAt(0);
-        range.deleteContents();
-        
-        // БЕЗОПАСНО: вставляем как текстовый узел
-        const textNode = document.createTextNode(codeStr);
-        range.insertNode(textNode);
-        
-        // Перемещаем курсор после вставки
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-        sel.removeAllRanges();
-        sel.addRange(range);
-        inserted = true;
-      } else {
-        // Fallback: безопасное добавление в конец
-        activeEl.appendChild(document.createTextNode(codeStr));
-        inserted = true;
+    chrome.storage.local.get("gmailSiteAllowlist", (data) => {
+      const allowlist = data?.gmailSiteAllowlist || [];
+      if (!isAllowedSiteHost(window.location.hostname, allowlist)) {
+        sendResponse({ success: false, reason: "site_not_allowed" });
+        return;
       }
 
-      // Триггерим событие для React/Vue
-      activeEl.dispatchEvent(new Event("input", { bubbles: true }));
-    }
+      lastPendingCode = String(message.code);
+      
+      let target = document.activeElement;
+      if (!isVisibleEditable(target) || !looksLikeOtpField(target)) {
+        const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="tel"], input[type="number"], input:not([type]), [contenteditable="true"]'));
+        target = inputs.find(i => isVisibleEditable(i) && looksLikeOtpField(i)) || null;
+      }
 
-    sendResponse({ success: inserted });
+      if (target) {
+        doInsert(target, lastPendingCode).then(ok => sendResponse({ success: ok }));
+        if (target) lastPendingCode = null;
+      } else {
+        sendResponse({ success: false, reason: "no_input" });
+      }
+    });
   }
   return true;
 });
+
+document.addEventListener('mousedown', (e) => {
+  if (lastPendingCode && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
+    doInsert(e.target, lastPendingCode);
+    lastPendingCode = null;
+  }
+}, true);

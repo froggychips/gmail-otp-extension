@@ -43,6 +43,8 @@ const accountToggleBtn = document.getElementById("accountToggle");
 const accountDropdown = document.getElementById("accountDropdown");
 const accountListEl = document.getElementById("accountList");
 const accountScrollerEl = document.getElementById("accountScroller");
+const siteAllowlistInputEl = document.getElementById("siteAllowlistInput");
+const clipboardClearSecondsInputEl = document.getElementById("clipboardClearSecondsInput");
 
 const I18N = {
   ru: {
@@ -198,6 +200,47 @@ let gmailMode = "auto";
 let currentAccountIndex = 0;
 let accountScrollerTimer = null;
 let isTestRunning = false;
+let siteAllowlist = [];
+let clipboardClearSeconds = 20;
+
+function hostnameFromUrl(url) {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function isAllowedSiteHost(hostname, allowlist = []) {
+  const normalizedHost = String(hostname || "").toLowerCase();
+  if (!normalizedHost) return false;
+  if (!Array.isArray(allowlist) || allowlist.length === 0) return true;
+  return allowlist.some((entry) => {
+    const domain = String(entry || "").trim().toLowerCase();
+    if (!domain) return false;
+    return normalizedHost === domain || normalizedHost.endsWith(`.${domain}`);
+  });
+}
+
+function parseDomainList(value) {
+  return String(value || "")
+    .split(/\n|,/)
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean)
+    .filter(s => /^[a-z0-9.-]+$/.test(s) && s.includes("."));
+}
+
+function clampClipboardSeconds(value) {
+  const parsed = parseInt(value, 10);
+  if (Number.isNaN(parsed)) return 20;
+  return Math.min(300, Math.max(0, parsed));
+}
+
+function sanitizeCsvValue(value) {
+  const str = String(value ?? "");
+  if (/^[=+\-@]/.test(str)) return `'${str}`;
+  return str;
+}
 
 async function sendMessageWithTimeout(message, timeout = 60000) {
   return new Promise((resolve, reject) => {
@@ -487,6 +530,8 @@ async function init() {
   gmailThreshold = stored[STORAGE_KEYS.threshold] || 3;
   gmailMode = stored[STORAGE_KEYS.mode] || "auto";
   isTestRunning = !!stored[STORAGE_KEYS.isTestRunning];
+  siteAllowlist = stored[STORAGE_KEYS.siteAllowlist] || [];
+  clipboardClearSeconds = Math.max(0, parseInt(stored[STORAGE_KEYS.clipboardClearSeconds], 10) || 20);
   const isAdvancedFilters = !!stored[STORAGE_KEYS.advancedTestMode];
   const isTestingTools = !!stored[STORAGE_KEYS.testingToolsMode];
   
@@ -508,6 +553,24 @@ async function init() {
   if (gmailQueryEl) {
     gmailQueryEl.value = gmailQuery;
     gmailQueryEl.addEventListener("input", saveQueryDebounced);
+  }
+
+  if (siteAllowlistInputEl) {
+    siteAllowlistInputEl.value = siteAllowlist.join("\n");
+    siteAllowlistInputEl.addEventListener("change", async () => {
+      siteAllowlist = parseDomainList(siteAllowlistInputEl.value);
+      siteAllowlistInputEl.value = siteAllowlist.join("\n");
+      await chrome.storage.local.set({ [STORAGE_KEYS.siteAllowlist]: siteAllowlist });
+    });
+  }
+
+  if (clipboardClearSecondsInputEl) {
+    clipboardClearSecondsInputEl.value = String(clipboardClearSeconds);
+    clipboardClearSecondsInputEl.addEventListener("change", async () => {
+      clipboardClearSeconds = clampClipboardSeconds(clipboardClearSecondsInputEl.value);
+      clipboardClearSecondsInputEl.value = String(clipboardClearSeconds);
+      await chrome.storage.local.set({ [STORAGE_KEYS.clipboardClearSeconds]: clipboardClearSeconds });
+    });
   }
   
   translateUI();
@@ -602,23 +665,26 @@ if (hero) {
     try {
       const code = gmailEntry.code;
       await navigator.clipboard.writeText(code);
-      
-      // SEND PASTE COMMAND TO PAGE
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, { action: "PASTE_OTP", code: code }).catch(() => {});
-        }
-      });
 
-      if (copyIndicatorEl) {
-        copyIndicatorEl.classList.add("show");
-        setTimeout(() => {
-          copyIndicatorEl.classList.remove("show");
-          window.close();
-        }, 600);
-      } else {
-        window.close();
+      const tabs = await new Promise((resolve) => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
+      const activeTab = tabs[0];
+      const activeHost = hostnameFromUrl(activeTab?.url || "");
+      const canPasteToTab = !!(activeTab?.id && activeTab?.url?.startsWith("https://") && isAllowedSiteHost(activeHost, siteAllowlist));
+      if (canPasteToTab) {
+        chrome.tabs.sendMessage(activeTab.id, { action: "PASTE_OTP", code }).catch(() => {});
       }
+
+      if (copyIndicatorEl) copyIndicatorEl.classList.add("show");
+      const closeDelayMs = Math.max(600, clipboardClearSeconds * 1000);
+      setTimeout(async () => {
+        try {
+          await navigator.clipboard.writeText("");
+        } catch (e) {
+          console.warn("Clipboard auto-clear failed:", e?.message || e);
+        }
+        if (copyIndicatorEl) copyIndicatorEl.classList.remove("show");
+        window.close();
+      }, closeDelayMs);
     } catch (e) { console.error("Copy failed"); }
   });
 }
@@ -694,7 +760,7 @@ if (exportFullBtn) {
             row.html
           ].map(val => {
             // Escape double quotes by doubling them
-            const str = String(val || "").replace(/"/g, '""');
+            const str = sanitizeCsvValue(val).replace(/"/g, '""');
             // Wrap in double quotes
             return `"${str}"`;
           });
