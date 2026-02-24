@@ -1,26 +1,30 @@
-# Guide to Improving OTP Code Detection
+# OTP Detection Improvements Roadmap
 
-## 1. Better Algorithms
-To improve the detection of OTP codes, consider implementing the following algorithms:
-- **Regular Expressions:** Utilize regex patterns to accurately match typical OTP formats (e.g., 6-digit codes).
-- **Machine Learning:** Implement machine learning techniques to predict OTP formats based on historical data and user behavior.
-- **Anomaly Detection:** Integrate anomaly detection methods to identify uncommon patterns in OTP requests that may require re-evaluation.
+## Implemented
 
-## 2. Multilingual Support
-Enhancing your OTP detection system to support multiple languages can greatly increase usability:
-- **Language Detection:** Automatically detect the language of the incoming messages and adjust the detection algorithms accordingly.
-- **Translation Libraries:** Utilize libraries such as Google Translate API to convert OTP messages for consistent handling.
+- Multi-candidate extraction from `subject + snippet + body` instead of first-match behavior.
+- Format-aware detection for numeric, alphanumeric, dashed, and label-based (`Code: ...`) patterns.
+- Combined scoring model:
+  - base format score,
+  - context score (OTP keywords vs transactional context),
+  - domain preference learning.
+- False-positive reduction:
+  - explicit stop words,
+  - excluded generic tokens,
+  - penalties for non-OTP-like words,
+  - booking/travel contextual penalties.
+- User feedback loop:
+  - allowlist/blocklist actions,
+  - code correction updates domain preferences,
+  - ignore action appends user stop words.
 
-## 3. Performance Optimization
-To ensure the OTP detection process runs smoothly and efficiently:
-- **Reduce Latency:** Optimize server responses by reducing unnecessary processing steps.
-- **Asynchronous Processing:** Implement asynchronous methods to handle OTP verification, allowing for quicker response times.
-- **Load Balancing:** Distribute server load effectively to manage high traffic during peak OTP request times.
+## In Progress
 
-## 4. Caching Strategies
-Implement caching to improve retrieval times for frequently accessed data:
-- **In-Memory Caching:** Use in-memory stores like Redis or Memcached to store commonly used OTP patterns or recently verified codes.
-- **TTL (Time to Live):** Set appropriate TTL for cached data to ensure outdated information is purged regularly, maintaining accuracy.
+- Broader multilingual keyword coverage beyond EN/RU.
+- Better explainability in UI (why candidate was picked/rejected).
 
-## Conclusion
-Improving OTP code detection involves continuous optimization and adaptation to user needs and behaviors. By enhancing algorithms, supporting multiple languages, optimizing performance, and utilizing caching strategies, you can create a robust and efficient OTP detection system. 
+## Next Candidates
+
+- Add dedicated regression corpus (real-world anonymized messages) in tests.
+- Introduce confidence bands for UI decisions (high/medium/low confidence).
+- Add optional domain-specific templates for high-volume providers.
