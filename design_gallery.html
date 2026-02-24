@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Gmail OTP Design Showcase</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body { background: #f0f2f5; font-family: 'Inter', sans-serif; padding: 40px; display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
+        .mockup { width: 340px; height: 500px; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.1); position: relative; background: #fff; border: 8px solid #333; }
+        .label { position: absolute; bottom: -30px; left: 0; right: 0; text-align: center; font-weight: bold; font-size: 14px; color: #555; }
+        
+        /* 1. Crystal Glass */
+        .v1 { background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800') center; background-size: cover; display: flex; flex-direction: column; padding: 20px; color: white; }
+        .v1-glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px); border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); padding: 20px; margin-top: 60px; text-align: center; }
+        .v1-code { font-family: 'JetBrains Mono'; font-size: 40px; margin: 15px 0; letter-spacing: 5px; }
+        
+        /* 2. Deep Cyber */
+        .v2 { background: #020617; color: #2dd4bf; padding: 20px; font-family: 'JetBrains Mono', monospace; }
+        .v2-border { border: 1px solid #1e293b; padding: 20px; border-radius: 4px; background: linear-gradient(to bottom, #0f172a, #020617); position: relative; margin-top: 40px; }
+        .v2-code { font-size: 42px; text-align: center; text-shadow: 0 0 15px rgba(45, 212, 191, 0.5); }
+        .v2-grid { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: radial-gradient(#1e293b 1px, transparent 1px); background-size: 20px 20px; opacity: 0.2; }
+
+        /* 3. Pure Apple */
+        .v3 { background: #f5f5f7; padding: 24px; color: #1d1d1f; }
+        .v3-card { background: white; border-radius: 28px; padding: 30px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); text-align: center; margin-top: 40px; }
+        .v3-code { font-size: 48px; font-weight: 800; letter-spacing: -1px; }
+        .v3-btn { background: #0071e3; color: white; border-radius: 20px; padding: 12px; margin-top: 20px; font-weight: 600; font-size: 13px; }
+
+        /* 4. Neo-Brutalism */
+        .v4 { background: #c3dafe; padding: 20px; }
+        .v4-card { background: #fff; border: 3px solid #000; box-shadow: 8px 8px 0 #000; padding: 20px; margin-top: 40px; }
+        .v4-code { font-size: 40px; font-weight: 900; text-align: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
+        .v4-btn { background: #fbbf24; border: 2px solid #000; padding: 10px; font-weight: bold; text-align: center; box-shadow: 4px 4px 0 #000; }
+
+        /* 5. Bento Grid */
+        .v5 { background: #f8fafc; padding: 15px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto; gap: 12px; }
+        .bento { background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 15px; }
+        .bento-main { grid-column: span 2; background: #2563eb; color: white; text-align: center; }
+        .bento-code { font-size: 32px; font-weight: 800; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. Crystal Glass -->
+    <div class="mockup">
+        <div class="v1">
+            <div style="font-weight: bold">Gmail OTP</div>
+            <div class="v1-glass">
+                <div style="font-size: 12px; opacity: 0.8">Latest Code</div>
+                <div class="v1-code">486690</div>
+                <div style="font-size: 10px; background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 12px; border-radius: 10px;">Grizzly SMS</div>
+            </div>
+        </div>
+        <div class="label">1. Crystal Glass</div>
+    </div>
+
+    <!-- 2. Deep Cyber -->
+    <div class="mockup">
+        <div class="v2">
+            <div class="v2-grid"></div>
+            <div style="font-size: 10px; color: #5eead4">SYSTEM_ACTIVE // VER 1.1.5</div>
+            <div class="v2-border">
+                <div style="font-size: 10px; margin-bottom: 10px;">> ACCESS_CODE_FOUND:</div>
+                <div class="v2-code">486690</div>
+            </div>
+            <div style="margin-top: 20px; font-size: 10px; opacity: 0.5;">SOURCE: postmaster@grizzlysms.com</div>
+        </div>
+        <div class="label">2. Deep Cyber</div>
+    </div>
+
+    <!-- 3. Pure Apple -->
+    <div class="mockup">
+        <div class="v3">
+            <div style="font-size: 20px; font-weight: 800;">Code</div>
+            <div class="v3-card">
+                <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">Grizzly SMS</div>
+                <div class="v3-code">486690</div>
+                <div class="v3-btn">Copy Code</div>
+            </div>
+        </div>
+        <div class="label">3. Pure Apple</div>
+    </div>
+
+    <!-- 4. Neo-Brutalism -->
+    <div class="mockup">
+        <div class="v4">
+            <div style="font-size: 24px; font-weight: 900; text-transform: uppercase;">Gmail OTP</div>
+            <div class="v4-card">
+                <div class="v4-code">486690</div>
+                <div style="font-weight: bold; font-size: 14px;">FROM: GRIZZLY SMS</div>
+            </div>
+            <div class="v4-btn" style="margin-top: 20px;">FETCH NEW</div>
+        </div>
+        <div class="label">4. Neo-Brutalism</div>
+    </div>
+
+    <!-- 5. Bento Grid -->
+    <div class="mockup">
+        <div class="v5">
+            <div class="bento bento-main">
+                <div style="font-size: 11px; opacity: 0.8;">Last OTP</div>
+                <div class="bento-code">486690</div>
+            </div>
+            <div class="bento" style="grid-column: span 1;">
+                <div style="font-size: 10px; color: #64748b;">Service</div>
+                <div style="font-weight: bold; font-size: 12px;">Agoda</div>
+            </div>
+            <div class="bento" style="grid-column: span 1;">
+                <div style="font-size: 10px; color: #64748b;">Time</div>
+                <div style="font-weight: bold; font-size: 12px;">08:54</div>
+            </div>
+            <div class="bento" style="grid-column: span 2; height: 100px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 12px;">
+                History List Here
+            </div>
+        </div>
+        <div class="label">5. Bento Grid</div>
+    </div>
+
+</body>
+</html>

@@ -1,2 +1,21 @@
-# Local design playground artifacts
-/design_gallery.html
+# Extensions
+*.zip
+*.crx
+*.pem
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Local/Secret files
+.env
+.env.local
+
+# Build/Tests
+tests/
+*.log

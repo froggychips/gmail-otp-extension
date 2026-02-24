@@ -1,0 +1,23 @@
+name: Build and Release Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create Release ZIP
+        run: |
+          zip -r gmail-otp-extension.zip . -x "*.git*" -x "*.github*" -x "node_modules/*" -x "tests/*" -x "*.DS_Store" -x "CHANGELOG.md" -x "RELEASE_CHECKLIST.md" -x "SECURITY_AUDIT_AND_PATCHES.md" -x "STORE_LISTING_DRAFT.md" -x "STORE_SUBMISSION.md" -x "SUPPORT_FAQ.md" -x "WEBSTORE_DISCLOSURE_CHECKLIST.md" -x "OTP_DETECTION_IMPROVEMENTS.md" -x "OTP_DETECTOR_CODE_REVIEW.md" -x "OTP_SCORING_RULES.md" -x "MAINTAINERS_RUNBOOK.md" -x "design_gallery.html"
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: gmail-otp-extension.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
