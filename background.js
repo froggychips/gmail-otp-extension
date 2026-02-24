@@ -5,7 +5,8 @@ import {
   findOtpCode, 
   containsOtpKeywords, 
   scoreCodeCandidate, 
-  validateGmailQuery 
+  validateGmailQuery,
+  findBestOtpCode
 } from './src/background/otp-detector.js';
 
 let currentOtpCode = null;
@@ -79,6 +80,31 @@ async function removeCachedToken(token) {
   return new Promise(resolve => chrome.identity.removeCachedAuthToken({ token }, resolve));
 }
 
+async function fetchLatestWithAuthRecovery(token, email, overrideQuery = "") {
+  try {
+    return await fetchLatestGmailCode(token, email, overrideQuery);
+  } catch (err) {
+    if (err?.message !== "auth_error") throw err;
+    await log(`Auth token expired for ${email}, retrying with a fresh token`);
+    await removeCachedToken(token).catch(() => {});
+    const freshToken = await getAuthToken(false, email);
+    return fetchLatestGmailCode(freshToken, email, overrideQuery);
+  }
+}
+
+async function runWithAuthRecovery(email, task) {
+  let token = await getAuthToken(false, email);
+  try {
+    return await task(token);
+  } catch (err) {
+    if (err?.message !== "auth_error") throw err;
+    await log(`Auth token expired for ${email}, retrying operation`);
+    await removeCachedToken(token).catch(() => {});
+    token = await getAuthToken(false, email);
+    return task(token);
+  }
+}
+
 function getHeader(headers, name) {
   return headers?.find(h => h?.name?.toLowerCase() === name.toLowerCase())?.value || "";
 }
@@ -102,12 +128,33 @@ function base64UrlDecode(input) {
   try { return atob(fixed + pad); } catch { return ""; }
 }
 
+function cleanHtml(html) {
+  if (!html) return "";
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ') // Remove CSS styles
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ') // Remove JS scripts
+    .replace(/<[^>]+>/g, ' ') // Replace all tags with spaces
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ') // Collapse multiple spaces
+    .trim();
+}
+
 function extractTextFromPayload(payload) {
   if (!payload) return "";
-  if (payload.mimeType?.toLowerCase().startsWith("text/") && payload.body?.data) {
+  // Prefer plain text
+  if (payload.mimeType?.toLowerCase() === "text/plain" && payload.body?.data) {
     return base64UrlDecode(payload.body.data);
   }
+  // Fallback to HTML but clean it
+  if (payload.mimeType?.toLowerCase() === "text/html" && payload.body?.data) {
+    return cleanHtml(base64UrlDecode(payload.body.data));
+  }
   if (Array.isArray(payload.parts)) {
+    // Try to find plain text part first
+    const plainPart = payload.parts.find(p => p.mimeType?.toLowerCase() === "text/plain");
+    if (plainPart) return extractTextFromPayload(plainPart);
+    
+    // If no plain text, take the first available part (usually HTML)
     for (const part of payload.parts) {
       const text = extractTextFromPayload(part);
       if (text) return text;
@@ -119,7 +166,8 @@ function extractTextFromPayload(payload) {
 async function fetchLatestGmailCode(token, email = "unknown", overrideQuery = "") {
   const stored = await storageGet([
     STORAGE_KEYS.query, STORAGE_KEYS.unreadOnly, 
-    STORAGE_KEYS.senderAllowlist, STORAGE_KEYS.senderBlocklist, STORAGE_KEYS.threshold
+    STORAGE_KEYS.senderAllowlist, STORAGE_KEYS.senderBlocklist, STORAGE_KEYS.threshold,
+    STORAGE_KEYS.userStopWords, STORAGE_KEYS.domainPrefs
   ]);
 
   const threshold = stored[STORAGE_KEYS.threshold] || 3;
@@ -127,17 +175,16 @@ async function fetchLatestGmailCode(token, email = "unknown", overrideQuery = ""
                 (stored[STORAGE_KEYS.unreadOnly] ? " is:unread" : "") + " in:inbox";
 
   await log(`Searching Gmail (${email}) with query:`, query);
-  const data = await gmailApiRequest(`messages?maxResults=30&q=${encodeURIComponent(query)}`, token, email);
+  // Fetch only top 10 for quick fetch
+  const data = await gmailApiRequest(`messages?maxResults=10&q=${encodeURIComponent(query)}`, token, email);
   if (!data.messages?.length) return null;
 
-  const fullMessages = await Promise.all(
-    data.messages.map(item => gmailApiRequest(`messages/${item.id}?format=full`, token, email).catch(() => null))
-  );
-
-  const sortedMessages = fullMessages.filter(Boolean).sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
   const unmatched = [];
 
-  for (const msg of sortedMessages) {
+  for (const item of data.messages) {
+    const msg = await gmailApiRequest(`messages/${item.id}?format=full`, token, email).catch(() => null);
+    if (!msg) continue;
+
     const headers = msg.payload?.headers || [];
     const subject = getHeader(headers, "Subject");
     const from = getHeader(headers, "From");
@@ -146,28 +193,39 @@ async function fetchLatestGmailCode(token, email = "unknown", overrideQuery = ""
     
     if (senderDomain && (stored[STORAGE_KEYS.senderBlocklist] || []).includes(senderDomain)) continue;
 
-    const code = findOtpCode(subject) || findOtpCode(msg.snippet) || findOtpCode(bodyText);
-    if (!code) {
+    const result = findBestOtpCode({ 
+      subject, from, snippet: msg.snippet, body: bodyText, senderDomain 
+    }, { 
+      senderAllowlist: stored[STORAGE_KEYS.senderAllowlist], 
+      senderBlocklist: stored[STORAGE_KEYS.senderBlocklist],
+      userStopWords: stored[STORAGE_KEYS.userStopWords],
+      domainPrefs: stored[STORAGE_KEYS.domainPrefs]
+    });
+
+    if (!result) {
       if (containsOtpKeywords(subject) || containsOtpKeywords(msg.snippet)) {
         unmatched.push({ id: msg.id, from, subject, date: getHeader(headers, "Date"), snippet: msg.snippet, domain: senderDomain });
       }
       continue;
     }
     
-    const score = scoreCodeCandidate({ 
-      code, subject, from, snippet: msg.snippet, body: bodyText, 
-      senderAllowlist: stored[STORAGE_KEYS.senderAllowlist], 
-      senderBlocklist: stored[STORAGE_KEYS.senderBlocklist], 
-      senderDomain 
-    });
+    const { code, score, others } = result;
 
     if (score < threshold) {
-      await log(`Code ${code} rejected (Score ${score} < ${threshold})`);
+      if (score > -5) {
+        await log(`Code ${code} rejected for ${email} (Score ${score} < ${threshold})`);
+      }
       continue;
     }
     
-    const entry = { code, id: msg.id, snippet: msg.snippet, subject, from, date: getHeader(headers, "Date"), score, account: email };
-    await log(`Valid code identified: ${code} (Score: ${score})`);
+    const entry = { 
+      code, others, id: msg.id, snippet: msg.snippet, subject, from, 
+      date: getHeader(headers, "Date"), score, account: email, 
+      domain: senderDomain, internalDate: msg.internalDate 
+    };
+    await log(`Valid code identified for ${email}: ${code} (Score: ${score})`);
+    
+    // Found a good code! Exit early.
     return entry;
   }
 
@@ -181,15 +239,24 @@ async function fetchLatestGmailCode(token, email = "unknown", overrideQuery = ""
 
 async function runGmailWatch() {
   try {
-    const { [STORAGE_KEYS.accounts]: accounts = [], [STORAGE_KEYS.history]: history = [] } = await storageGet([STORAGE_KEYS.accounts, STORAGE_KEYS.history]);
-    if (!accounts.length) return;
+    const { 
+      [STORAGE_KEYS.accounts]: accounts = [], 
+      [STORAGE_KEYS.isTestRunning]: isTestRunning = false 
+    } = await storageGet([STORAGE_KEYS.accounts, STORAGE_KEYS.isTestRunning]);
+    
+    if (!accounts.length || isTestRunning) return;
 
     await storageSet({ [STORAGE_KEYS.lastCheckTime]: Date.now() });
 
     for (const account of accounts) {
       try {
-        const token = await getAuthToken(false, account.email);
-        const codeData = await fetchLatestGmailCode(token, account.email);
+        // Sequential auth to avoid Chrome Identity conflict
+        const token = await Promise.race([
+          getAuthToken(false, account.email),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Auth timeout")), 5000))
+        ]);
+
+        const codeData = await fetchLatestWithAuthRecovery(token, account.email);
         
         if (codeData && codeData.id !== account.lastMessageId) {
           updateOtpContextMenu(codeData.code);
@@ -198,19 +265,31 @@ async function runGmailWatch() {
           const target = accountsToSave.find(a => a.email === account.email);
           if (target) target.lastMessageId = codeData.id;
 
+          const updatedHistory = [codeData, ...(fresh[STORAGE_KEYS.history] || [])];
+          updatedHistory.sort((a, b) => parseInt(b.internalDate || 0) - parseInt(a.internalDate || 0));
+
           await storageSet({ 
             [STORAGE_KEYS.accounts]: accountsToSave,
             [STORAGE_KEYS.lastEntry]: codeData,
-            [STORAGE_KEYS.history]: [codeData, ...(fresh[STORAGE_KEYS.history] || [])].slice(0, 10)
+            [STORAGE_KEYS.history]: updatedHistory.slice(0, 50)
           });
 
           chrome.notifications.create(`otp-${account.email}`, {
             type: "basic", iconUrl: "icons/frogus-128.png",
             title: `Gmail OTP (${account.email})`, message: `Код: ${codeData.code}`, priority: 2
           });
+
+          // AUTO-INSERT: Try to paste into the active tab
+          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0]?.id) {
+              chrome.tabs.sendMessage(tabs[0].id, { action: "PASTE_OTP", code: codeData.code }).catch(() => {});
+            }
+          });
         }
       } catch (err) {
-        if (err.message !== "Auth failed") await log(`[Watch] Error for ${account.email}:`, err.message);
+        if (err.message !== "Auth failed" && err.message !== "rate_limit_backoff") {
+          await log(`[Watch] Error for ${account.email}:`, err.message);
+        }
       }
     }
   } catch (e) { await log("[GmailWatch] Global error:", e.message); }
@@ -229,7 +308,7 @@ function updateOtpContextMenu(code) {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: "pasteOtp", title: `Вставить OTP: ${code}`,
-      contexts: ["editable", "password", "text", "search", "tel", "url", "number"]
+      contexts: ["editable"]
     });
   });
 }
@@ -242,13 +321,18 @@ chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === "gmailWatch") 
 
 async function performTestRun(token, email = "unknown") {
   const stored = await storageGet([
-    STORAGE_KEYS.senderAllowlist, STORAGE_KEYS.senderBlocklist, STORAGE_KEYS.threshold
+    STORAGE_KEYS.senderAllowlist, STORAGE_KEYS.senderBlocklist, STORAGE_KEYS.threshold,
+    STORAGE_KEYS.query, STORAGE_KEYS.unreadOnly, STORAGE_KEYS.userStopWords, STORAGE_KEYS.domainPrefs
   ]);
   const threshold = stored[STORAGE_KEYS.threshold] || 3;
-  // Deep scan: no newer_than, just OTP keywords
-  const query = "subject:(code OR verification OR подтверждение OR код) in:inbox";
+  const userQuery = stored[STORAGE_KEYS.query];
   
-  await log(`Starting DEEP TEST RUN for ${email}...`);
+  // Use user's query if available, otherwise default deep scan query
+  let query = userQuery || "subject:(code OR verification OR подтверждение OR код)";
+  if (stored[STORAGE_KEYS.unreadOnly]) query += " is:unread";
+  query += " in:inbox";
+  
+  await log(`Starting DEEP TEST RUN for ${email} with query: ${query}`);
   const data = await gmailApiRequest(`messages?maxResults=500&q=${encodeURIComponent(query)}`, token, email);
   if (!data.messages?.length) {
     await log("Test run: No messages found.");
@@ -262,9 +346,22 @@ async function performTestRun(token, email = "unknown") {
   const batchSize = 20;
   for (let i = 0; i < data.messages.length; i += batchSize) {
     const batch = data.messages.slice(i, i + batchSize);
-    const details = await Promise.all(
-      batch.map(item => gmailApiRequest(`messages/${item.id}?format=full`, token, email).catch(() => null))
-    );
+    let details = [];
+    
+    try {
+      details = await Promise.all(
+        batch.map(item => gmailApiRequest(`messages/${item.id}?format=full`, token, email))
+      );
+    } catch (err) {
+      if (err.message === "rate_limit" || err.message === "rate_limit_backoff") {
+        await log(`Test Run paused for 30s due to rate limit for ${email}`);
+        await new Promise(r => setTimeout(r, 30000));
+        i -= batchSize; // Retry this batch
+        continue;
+      }
+      // Log other errors but try to continue with next batch
+      await log(`Batch fetch error for ${email}:`, err.message);
+    }
 
     for (const msg of details) {
       if (!msg) continue;
@@ -274,21 +371,24 @@ async function performTestRun(token, email = "unknown") {
       const bodyText = extractTextFromPayload(msg.payload);
       const senderDomain = extractEmailDomain(from);
       
-      const code = findOtpCode(subject) || findOtpCode(msg.snippet) || findOtpCode(bodyText);
-      if (!code) continue;
-
-      const score = scoreCodeCandidate({ 
-        code, subject, from, snippet: msg.snippet, body: bodyText, 
+      const result = findBestOtpCode({ 
+        subject, from, snippet: msg.snippet, body: bodyText, senderDomain 
+      }, { 
         senderAllowlist: stored[STORAGE_KEYS.senderAllowlist], 
-        senderBlocklist: stored[STORAGE_KEYS.senderBlocklist], 
-        senderDomain 
+        senderBlocklist: stored[STORAGE_KEYS.senderBlocklist],
+        userStopWords: stored[STORAGE_KEYS.userStopWords],
+        domainPrefs: stored[STORAGE_KEYS.domainPrefs]
       });
+
+      if (!result) continue;
+
+      const { code, score, others } = result;
 
       if (score >= threshold) {
         allFoundCodes.push({
-          code, id: msg.id, snippet: msg.snippet, subject, from, 
+          code, others, id: msg.id, snippet: msg.snippet, subject, from, 
           date: getHeader(headers, "Date"), score, account: email,
-          internalDate: msg.internalDate
+          domain: senderDomain, internalDate: msg.internalDate
         });
       }
     }
@@ -307,23 +407,113 @@ async function performTestRun(token, email = "unknown") {
   return allFoundCodes;
 }
 
+function extractHtmlFromPayload(payload) {
+  if (!payload) return "";
+  if (payload.mimeType?.toLowerCase() === "text/html" && payload.body?.data) {
+    return base64UrlDecode(payload.body.data);
+  }
+  if (Array.isArray(payload.parts)) {
+    for (const part of payload.parts) {
+      const html = extractHtmlFromPayload(part);
+      if (html) return html;
+    }
+  }
+  return "";
+}
+
+async function performFullExport(token, email = "unknown") {
+  const query = "subject:(code OR verification OR подтверждение OR код) in:inbox";
+  await log(`Starting MASSIVE EXPORT for ${email}...`);
+  
+  const data = await gmailApiRequest(`messages?maxResults=1000&q=${encodeURIComponent(query)}`, token, email);
+  if (!data.messages?.length) return [];
+
+  const results = [];
+  const batchSize = 15; // Slightly smaller batch for heavy HTML content
+  
+  for (let i = 0; i < data.messages.length; i += batchSize) {
+    const batch = data.messages.slice(i, i + batchSize);
+    const details = await Promise.all(
+      batch.map(item => gmailApiRequest(`messages/${item.id}?format=full`, token, email).catch(() => null))
+    );
+
+    for (const msg of details) {
+      if (!msg) continue;
+      const headers = msg.payload?.headers || [];
+      const bodyText = extractTextFromPayload(msg.payload);
+      const bodyHtml = extractHtmlFromPayload(msg.payload);
+      
+      // Permissive regex for export: find everything that looks like a code
+      const allNumbers = (bodyText + getHeader(headers, "Subject")).match(/\b[A-Z0-9\-\s]{4,12}\b/gi) || [];
+      
+      results.push({
+        email,
+        subject: getHeader(headers, "Subject"),
+        from: getHeader(headers, "From"),
+        date: getHeader(headers, "Date"),
+        snippet: msg.snippet,
+        detectedCodes: [...new Set(allNumbers.map(n => n.trim()).filter(n => n.length >= 4))],
+        html: bodyHtml
+      });
+    }
+    await log(`Export progress: ${Math.min(i + batchSize, data.messages.length)}/1000`);
+  }
+  return results;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === MSG.testRun) {
+  if (message.type === MSG.exportFull) {
     storageGet(STORAGE_KEYS.accounts).then(async data => {
       const accounts = data[STORAGE_KEYS.accounts] || [];
-      let totalFound = 0;
+      const allResults = [];
       for (const account of accounts) {
         try {
-          const token = await getAuthToken(false, account.email);
-          const results = await performTestRun(token, account.email);
-          totalFound += results.length;
+          const results = await runWithAuthRecovery(
+            account.email,
+            (token) => performFullExport(token, account.email)
+          );
+          allResults.push(...results);
         } catch (e) {
-          await log(`Test run failed for ${account.email}:`, e.message);
+          await log(`Full export failed for ${account.email}:`, e.message);
         }
       }
-      sendResponse({ ok: true, count: totalFound });
+      sendResponse({ ok: true, data: allResults });
     });
     return true;
+  }
+  if (message.type === MSG.testRun) {
+    // Respond immediately to popup
+    sendResponse({ ok: true });
+    
+    // Start the process in background
+    storageSet({ [STORAGE_KEYS.isTestRunning]: true }).then(async () => {
+      try {
+        const { [STORAGE_KEYS.accounts]: accounts = [] } = await storageGet(STORAGE_KEYS.accounts);
+        let totalFound = 0;
+        for (const account of accounts) {
+          try {
+            const results = await runWithAuthRecovery(
+              account.email,
+              (token) => performTestRun(token, account.email)
+            );
+            totalFound += results.length;
+          } catch (e) {
+            await log(`Background Test Run failed for ${account.email}:`, e.message);
+          }
+        }
+        
+        // Notify user when done
+        chrome.notifications.create("test-run-done", {
+          type: "basic", iconUrl: "icons/frogus-128.png",
+          title: "Глубокий тест завершен",
+          message: `Найдено кодов: ${totalFound}. Проверьте вкладку "История".`,
+          priority: 2
+        });
+      } finally {
+        await storageSet({ [STORAGE_KEYS.isTestRunning]: false });
+      }
+    });
+    return true; // Keep channel open (optional but good practice)
   }
   if (message.type === MSG.modeAuto) {
     storageSet({ [STORAGE_KEYS.mode]: "auto" }).then(() => { updateAlarmState("auto"); log("Mode: Auto"); sendResponse({ ok: true }); });
@@ -367,16 +557,155 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === MSG.fetch) {
     storageGet(STORAGE_KEYS.accounts).then(async data => {
       const accounts = data[STORAGE_KEYS.accounts] || [];
-      let bestCode = null;
+      if (accounts.length === 0) {
+        sendResponse({ ok: true, code: null });
+        return;
+      }
+
+      // 1. Acquire tokens SEQUENTIALLY (Chrome Identity API limit)
+      const accountsWithTokens = [];
       for (const account of accounts) {
         try {
-          const token = await getAuthToken(false, account.email);
-          const code = await fetchLatestGmailCode(token, account.email, message.query);
-          if (code && (!bestCode || code.date > bestCode.date)) bestCode = code;
-        } catch (e) {}
+          const token = await Promise.race([
+            getAuthToken(false, account.email),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Auth timeout")), 5000))
+          ]);
+          accountsWithTokens.push({ ...account, token });
+        } catch (e) {
+          await log(`Auth failed for ${account.email}:`, e.message);
+        }
       }
-      if (bestCode) storageSet({ [STORAGE_KEYS.lastEntry]: bestCode });
+
+      // 2. Fetch from Gmail PARALLELLY (Fast)
+      const results = await Promise.all(accountsWithTokens.map(async (acc) => {
+        try {
+          return await fetchLatestWithAuthRecovery(acc.token, acc.email, message.query);
+        } catch (e) {
+          await log(`Fetch failed for ${acc.email}:`, e.message);
+          return null;
+        }
+      }));
+
+      // Pick the best code among all results
+      let bestCode = null;
+      for (const code of results) {
+        if (code && (!bestCode || parseInt(code.internalDate) > parseInt(bestCode.internalDate))) {
+          bestCode = code;
+        }
+      }
+      
+      if (bestCode) {
+        const fresh = await storageGet([STORAGE_KEYS.history, STORAGE_KEYS.accounts]);
+        const existingHistory = fresh[STORAGE_KEYS.history] || [];
+        const accountsToSave = fresh[STORAGE_KEYS.accounts] || [];
+        const target = accountsToSave.find(a => a.email === bestCode.account);
+        if (target) target.lastMessageId = bestCode.id;
+        
+        if (!existingHistory.some(h => h.id === bestCode.id)) {
+          const updatedHistory = [bestCode, ...existingHistory];
+          updatedHistory.sort((a, b) => parseInt(b.internalDate || 0) - parseInt(a.internalDate || 0));
+          await storageSet({ 
+            [STORAGE_KEYS.accounts]: accountsToSave,
+            [STORAGE_KEYS.lastEntry]: bestCode,
+            [STORAGE_KEYS.history]: updatedHistory.slice(0, 50)
+          });
+        } else {
+          await storageSet({ 
+            [STORAGE_KEYS.accounts]: accountsToSave,
+            [STORAGE_KEYS.lastEntry]: bestCode
+          });
+        }
+      }
+
+      // Reset alarm to 1 minute from now since we just checked
+      const { [STORAGE_KEYS.mode]: mode = "auto" } = await storageGet(STORAGE_KEYS.mode);
+      if (mode === "auto") {
+        chrome.alarms.create("gmailWatch", { periodInMinutes: 1 });
+      }
+
       sendResponse({ ok: true, code: bestCode });
+    }).catch(err => {
+      log("Global fetch error:", err.message);
+      sendResponse({ ok: false, error: err.message });
+    });
+    return true;
+  }
+  if (message.type === MSG.markAsCode) {
+    storageGet([STORAGE_KEYS.senderAllowlist, STORAGE_KEYS.unmatched]).then(data => {
+      const allowlist = new Set(data[STORAGE_KEYS.senderAllowlist] || []);
+      const unmatched = data[STORAGE_KEYS.unmatched] || [];
+      if (message.domain) allowlist.add(message.domain);
+      const filtered = unmatched.filter(m => m.id !== message.id);
+      storageSet({ 
+        [STORAGE_KEYS.senderAllowlist]: Array.from(allowlist),
+        [STORAGE_KEYS.unmatched]: filtered
+      }).then(() => {
+        log(`Marked as code, added to allowlist: ${message.domain}`);
+        sendResponse({ ok: true });
+      });
+    });
+    return true;
+  }
+  if (message.type === MSG.markAsNoCode) {
+    storageGet([STORAGE_KEYS.senderBlocklist, STORAGE_KEYS.unmatched]).then(data => {
+      const blocklist = new Set(data[STORAGE_KEYS.senderBlocklist] || []);
+      const unmatched = data[STORAGE_KEYS.unmatched] || [];
+      if (message.domain) blocklist.add(message.domain);
+      const filtered = unmatched.filter(m => m.id !== message.id);
+      storageSet({ 
+        [STORAGE_KEYS.senderBlocklist]: Array.from(blocklist),
+        [STORAGE_KEYS.unmatched]: filtered
+      }).then(() => {
+        log(`Marked as no code, added to blocklist: ${message.domain}`);
+        sendResponse({ ok: true });
+      });
+    });
+    return true;
+  }
+  if (message.type === MSG.correctCode) {
+    storageGet([STORAGE_KEYS.domainPrefs, STORAGE_KEYS.history]).then(async data => {
+      const prefs = data[STORAGE_KEYS.domainPrefs] || {};
+      const history = data[STORAGE_KEYS.history] || [];
+      
+      if (message.domain && message.code) {
+        prefs[message.domain] = { 
+          len: message.code.length, 
+          isNum: /^\d+$/.test(message.code) 
+        };
+      }
+      
+      const item = history.find(h => h.id === message.id);
+      if (item) {
+        item.code = message.code;
+        // Optionally swap with original code in 'others'
+      }
+
+      await storageSet({ 
+        [STORAGE_KEYS.domainPrefs]: prefs,
+        [STORAGE_KEYS.history]: history,
+        [STORAGE_KEYS.lastEntry]: item || null
+      });
+      log(`Learned preference for ${message.domain}: ${message.code.length} chars`);
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+  if (message.type === MSG.ignoreCode) {
+    storageGet([STORAGE_KEYS.userStopWords, STORAGE_KEYS.history]).then(async data => {
+      const stopWords = new Set(data[STORAGE_KEYS.userStopWords] || []);
+      const history = data[STORAGE_KEYS.history] || [];
+      
+      if (message.code) stopWords.add(message.code);
+      
+      const filteredHistory = history.filter(h => h.id !== message.id);
+
+      await storageSet({ 
+        [STORAGE_KEYS.userStopWords]: Array.from(stopWords),
+        [STORAGE_KEYS.history]: filteredHistory,
+        [STORAGE_KEYS.lastEntry]: null
+      });
+      log(`Added to user stop words: ${message.code}`);
+      sendResponse({ ok: true });
     });
     return true;
   }
